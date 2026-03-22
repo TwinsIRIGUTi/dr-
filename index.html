@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Dr.モツオリス - 設定6</title>
+    <style>
+        :root {
+            --bg-color: #1a1a1a;
+            --panel-color: #2c3e50;
+            --gold: #ffcc00;
+            --pastel-i: #a2d2ff; --pastel-o: #fdfd96; --pastel-s: #b1ffb1;
+            --pastel-z: #ffb1b1; --pastel-j: #c1c1ff; --pastel-l: #ffcc99; --pastel-t: #e1e1e1;
+        }
+        body {
+            background-color: var(--bg-color);
+            color: white;
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0;
+            touch-action: none;
+        }
+        h1 { margin: 15px 0; font-size: 28px; color: #eee; }
+        #game-wrapper { position: relative; }
+        #score-container {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.6);
+            padding: 5px 10px;
+            border-radius: 4px;
+            z-index: 10;
+            font-family: monospace;
+            font-size: 18px;
+        }
+        #word-log {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 100;
+            pointer-events: none;
+            text-align: center;
+        }
+        .gold-word {
+            color: var(--gold);
+            font-size: 52px;
+            font-weight: bold;
+            text-shadow: 0 0 20px rgba(255,215,0,0.8), 3px 3px 0 #000;
+            animation: fadeUp 3s forwards;
+            display: block;
+        }
+        @keyframes fadeUp {
+            0% { opacity: 0; transform: translateY(20px) scale(0.8); }
+            10% { opacity: 1; transform: translateY(0) scale(1.1); }
+            90% { opacity: 1; }
+            100% { opacity: 0; transform: translateY(-50px); }
+        }
+        canvas {
+            background: #000;
+            border: 5px solid #444;
+            display: block;
+            box-shadow: 0 0 30px rgba(0,0,0,0.5);
+        }
+        .btn-group { margin-top: 15px; display: flex; gap: 10px; }
+        button {
+            padding: 12px 20px;
+            font-size: 20px;
+            cursor: pointer;
+            border: none;
+            border-radius: 8px;
+            background: #444;
+            color: white;
+        }
+        button:active { background: #666; }
+        #pause-btn { background: #8e44ad; }
+        #overlay {
+            display: none;
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 200;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Dr.モツオリス</h1>
+
+    <div id="game-wrapper">
+        <div id="score-container">スコア: <span id="score">0</span></div>
+        <div id="word-log"></div>
+        <canvas id="board"></canvas>
+        
+        <div id="overlay">
+            <h2 id="msg">GAME OVER</h2>
+            <button onclick="location.reload()">もう一度</button>
+            <button onclick="quit()">終了</button>
+        </div>
+    </div>
+
+    <div class="btn-group">
+        <button onmousedown="handleInput('ArrowLeft')">←</button>
+        <button onmousedown="handleInput('ArrowDown')">↓</button>
+        <button onmousedown="handleInput('ArrowRight')">→</button>
+    </div>
+    <div class="btn-group">
+        <button id="pause-btn" onclick="togglePause()">⏸</button>
+    </div>
+
+<script>
+const COLS = 10, ROWS = 20, SIZE = 30;
+const CHARS = "アイウオカガキコサシロスタダツナニクネハホマミメラリルレワンバブビドーズ".split("");
+const TARGETS = ["シロ","レバ","ガツ","コブクロ","ナンコツ","アブラ","ハツ","カシラ","ビール","ウメワリ","ブドウワリ","ウイスキー","サイダー","ツル","シンキ","タンナマ","オシンコ","ダイコン","ニコミ","ホネ","ツインズ"];
+const MINOS = {
+    I:[[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]],
+    O:[[1,1],[1,1]],
+    S:[[0,1,1],[1,1,0],[0,0,0]],
+    Z:[[1,1,0],[0,1,1],[0,0,0]],
+    J:[[1,0,0],[1,1,1],[0,0,0]],
+    L:[[0,0,1],[1,1,1],[0,0,0]],
+    T:[[0,1,0],[1,1,1],[0,0,0]]
+};
+const COLORS = {I:'#a2d2ff', O:'#fdfd96', S:'#b1ffb1', Z:'#ffb1b1', J:'#c1c1ff', L:'#ffcc99', T:'#e1e1e1'};
+
+const canvas = document.getElementById('board');
+const ctx = canvas.getContext('2d');
+canvas.width = COLS * SIZE; canvas.height = ROWS * SIZE;
+
+let grid = Array.from({length: ROWS}, () => Array(COLS).fill(null));
+let score = 0, paused = false, over = false, dropTimer = 0, dropSpeed = 500, lastTime = 0, levelClock = 0;
+let current = null;
+
+class Piece {
+    constructor() {
+        const keys = Object.keys(MINOS);
+        this.type = keys[Math.floor(Math.random()*keys.length)];
+        this.color = COLORS[this.type];
+        let shape = MINOS[this.type];
+        // 28パターン対応（ランダム回転）
+        const rotCount = Math.floor(Math.random()*4);
+        for(let i=0; i<rotCount; i++) shape = this.rotate(shape);
+        
+        this.shape = shape;
+        this.x = Math.floor(COLS/2 - shape[0].length/2);
+        this.y = -1;
+        this.data = shape.map(row => row.map(v => v ? CHARS[Math.floor(Math.random()*CHARS.length)] : null));
+    }
+    rotate(matrix) {
+        return matrix[0].map((_, i) => matrix.map(row => row[i]).reverse());
+    }
+}
+
+function draw() {
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    // 盤面
+    grid.forEach((row, y) => row.forEach((v, x) => { if(v) drawBlock(x, y, v.color, v.char); }));
+    // 動いているミノ
+    if(current) {
+        current.data.forEach((row, dy) => row.forEach((char, dx) => {
+            if(char) drawBlock(current.x + dx, current.y + dy, current.color, char);
+        }));
+    }
+}
+
+function drawBlock(x, y, color, char) {
+    if(y < 0) return;
+    ctx.fillStyle = color;
+    ctx.fillRect(x*SIZE, y*SIZE, SIZE, SIZE);
+    ctx.strokeStyle = "rgba(0,0,0,0.2)";
+    ctx.strokeRect(x*SIZE, y*SIZE, SIZE, SIZE);
+    ctx.fillStyle = "#333";
+    ctx.font = "bold 18px sans-serif";
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(char, x*SIZE + SIZE/2, y*SIZE + SIZE/2);
+}
+
+function collide(nx, ny, ndata = current.data) {
+    return ndata.some((row, dy) => row.some((char, dx) => {
+        if(!char) return false;
+        let x = nx + dx, y = ny + dy;
+        return x < 0 || x >= COLS || y >= ROWS || (y >= 0 && grid[y][x]);
+    }));
+}
+
+function drop() {
+    if(collide(current.x, current.y + 1)) {
+        lock();
+    } else {
+        current.y++;
+    }
+    dropTimer = 0;
+}
+
+function lock() {
+    current.data.forEach((row, dy) => row.forEach((char, dx) => {
+        if(char) {
+            let y = current.y + dy;
+            if(y < 0) over = true;
+            else grid[y][current.x + dx] = {char, color: current.color};
+        }
+    }));
+    if(over) {
+        document.getElementById('overlay').style.display = 'flex';
+        return;
+    }
+    settle();
+}
+
+// ドクターマリオ式落下（安定するまで繰り返す）
+function settle() {
+    let changed = false;
+    for(let y = ROWS - 2; y >= 0; y--) {
+        for(let x = 0; x < COLS; x++) {
+            if(grid[y][x] && !grid[y+1][x]) {
+                grid[y+1][x] = grid[y][x];
+                grid[y][x] = null;
+                changed = true;
+            }
+        }
+    }
+    if(changed) setTimeout(settle, 50); // 視覚的な落下の間隔
+    else checkLines();
+}
+
+function checkLines() {
+    let clearedCount = 0;
+    for(let y = 0; y < ROWS; y++) {
+        if(grid[y].every(c => c !== null)) {
+            const lineStr = grid[y].map(c => c.char).join("");
+            TARGETS.forEach(word => {
+                let idx = lineStr.indexOf(word);
+                while(idx !== -1) {
+                    score += (word.length * 10);
+                    showWord(word);
+                    idx = lineStr.indexOf(word, idx + 1);
+                }
+            });
+            grid.splice(y, 1);
+            grid.unshift(Array(COLS).fill(null));
+            score += 1000;
+            clearedCount++;
+        }
+    }
+    document.getElementById('score').innerText = score;
+    spawn();
+}
+
+function showWord(w) {
+    const log = document.getElementById('word-log');
+    const span = document.createElement('span');
+    span.className = 'gold-word';
+    span.innerText = w;
+    log.appendChild(span);
+    setTimeout(() => span.remove(), 3000);
+}
+
+function spawn() {
+    current = new Piece();
+    if(collide(current.x, current.y)) over = true;
+}
+
+function handleInput(key) {
+    if(over || paused || !current) return;
+    if(key === 'ArrowLeft' && !collide(current.x - 1, current.y)) current.x--;
+    if(key === 'ArrowRight' && !collide(current.x + 1, current.y)) current.x++;
+    if(key === 'ArrowDown') drop();
+    draw();
+}
+
+function togglePause() {
+    paused = !paused;
+    document.getElementById('pause-btn').innerText = paused ? '▶' : '⏸';
+    if(!paused) requestAnimationFrame(loop);
+}
+
+function quit() {
+    alert("また遊んでね！");
+    location.reload();
+}
+
+function loop(t) {
+    if(over || paused) return;
+    const dt = t - lastTime;
+    lastTime = t;
+    dropTimer += dt;
+    levelClock += dt;
+
+    if(levelClock > 15000) {
+        dropSpeed = Math.max(80, dropSpeed - 30);
+        levelClock = 0;
+    }
+    if(dropTimer > dropSpeed) drop();
+    
+    draw();
+    requestAnimationFrame(loop);
+}
+
+window.addEventListener('keydown', e => {
+    if(e.code === 'Space') togglePause();
+    else handleInput(e.code);
+});
+
+spawn();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
