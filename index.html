@@ -2,32 +2,40 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>モツリス - Tetris Style</title>
+    <title>モツリス - 完全版</title>
     <style>
         :root {
-            --bg-color: #121212;
-            --gold: #ffd700;
+            --bg-color: #101010;
+            --grid-color: #2a2a2a;
+            --gold: #ffcc00;
+            /* パステルカラー定義 */
+            --pastel-i: #a2d2ff; --pastel-o: #fdfd96; --pastel-s: #b1ffb1;
+            --pastel-z: #ffb1b1; --pastel-j: #c1c1ff; --pastel-l: #ffcc99; --pastel-t: #e1e1e1;
         }
         body {
             background-color: var(--bg-color);
             color: white;
-            font-family: sans-serif;
+            font-family: 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif;
             display: flex;
             flex-direction: column;
             align-items: center;
             margin: 0;
             overflow: hidden;
+            touch-action: none;
         }
-        h1 { margin: 10px 0; color: #eee; font-size: 24px; }
-        #game-container { position: relative; border: 4px solid #333; }
+        h1 { margin: 10px 0; color: #eee; font-size: 26px; text-shadow: 0 0 5px rgba(255,255,255,0.3); }
+        #game-container { position: relative; border: 4px solid #444; background: #000; box-shadow: 0 0 20px rgba(0,0,0,0.8); }
         #score-box {
             position: absolute;
             top: 10px;
             left: 10px;
             z-index: 10;
-            font-size: 18px;
-            background: rgba(0,0,0,0.7);
-            padding: 5px;
+            font-size: 19px;
+            font-weight: bold;
+            background: rgba(0,0,0,0.8);
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-family: monospace;
         }
         #word-overlay {
             position: absolute;
@@ -36,37 +44,53 @@
             z-index: 100;
             text-align: center;
             pointer-events: none;
+            width: 100%;
         }
         .gold-msg {
             color: var(--gold);
-            font-size: 40px;
+            font-size: 48px;
             font-weight: bold;
-            text-shadow: 0 0 10px #000;
-            animation: fadeOut 3s forwards;
+            text-shadow: 0 0 15px rgba(255,200,0,0.7), 2px 2px 0 #000;
+            animation: fadeOutUp 3s forwards;
             display: block;
+            margin-bottom: 10px;
         }
-        @keyframes fadeOut {
-            0% { opacity: 1; transform: scale(1); }
-            100% { opacity: 0; transform: scale(1.2) translateY(-50px); }
+        @keyframes fadeOutUp {
+            0% { opacity: 0; transform: scale(0.8) translateY(20px); }
+            10% { opacity: 1; transform: scale(1) translateY(0); }
+            80% { opacity: 1; }
+            100% { opacity: 0; transform: scale(1.1) translateY(-60px); }
         }
-        canvas { display: block; background: #000; }
-        .controls { margin-top: 10px; display: flex; gap: 8px; }
-        button { padding: 10px 20px; font-size: 18px; cursor: pointer; border-radius: 5px; border: none; }
+        canvas { display: block; }
+        .controls { margin-top: 15px; display: flex; gap: 12px; }
+        button {
+            padding: 12px 24px;
+            font-size: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 8px;
+            border: none;
+            background: #333;
+            color: white;
+            transition: background 0.1s;
+        }
+        button:active { background: #555; transform: scale(0.95); }
         #modal {
             display: none;
             position: absolute;
             top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.8);
+            background: rgba(0,0,0,0.9);
             flex-direction: column;
             justify-content: center;
             align-items: center;
             z-index: 200;
         }
+        #modal h2 { font-size: 32px; color: #e74c3c; margin-bottom: 20px; }
     </style>
 </head>
 <body>
 
-    <h1>Dr.モツオリス</h1>
+    <h1>モツリス</h1>
 
     <div id="game-container">
         <div id="score-box">スコア: <span id="score-val">0</span></div>
@@ -76,21 +100,32 @@
         <div id="modal">
             <h2>GAME OVER</h2>
             <button onclick="location.reload()">もう一度</button>
-            <button onclick="alert('また遊んでね！');location.reload();" style="margin-top:10px">終了</button>
+            <button onclick="alert('また遊んでね！');location.reload();" style="margin-top:15px; background:#c0392b;">終了</button>
         </div>
     </div>
 
     <div class="controls">
         <button onclick="input('ArrowLeft')">←</button>
-        <button onclick="input('ArrowUp')">回転</button>
+        <button onclick="input('ArrowUp')" style="background:#8e44ad;">回転</button>
         <button onclick="input('ArrowRight')">→</button>
         <button onclick="input('ArrowDown')">↓</button>
     </div>
 
 <script>
-const COLS = 10, ROWS = 20, BLOCK = 30;
-const CHARS = "アイウオカガキコサシロスタダツナニクネハホマミメラリルレワンバブビドーズ".split("");
+/**
+ * 定数・設定
+ */
+const COLS = 10;
+const ROWS = 20;
+const BLOCK = 30; // 1マスのピクセル数
+
+// 出現するカタカナを完全に限定（36文字＋長音）
+const CHARS = "アイウオカガキコサシロスタダツナニクネハホマミメラリルレワンバブビドーズー".split("");
+
+// 得点になる単語リスト
 const WORDS = ["シロ","レバ","ガツ","コブクロ","ナンコツ","アブラ","ハツ","カシラ","ビール","ウメワリ","ブドウワリ","ウイスキー","サイダー","ツル","シンキ","タンナマ","オシンコ","ダイコン","ニコミ","ホネ","ツインズ"];
+
+// テトリスミノの形状定義
 const SHAPES = {
     I:[[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]],
     O:[[1,1],[1,1]],
@@ -100,45 +135,79 @@ const SHAPES = {
     L:[[0,0,1],[1,1,1],[0,0,0]],
     T:[[0,1,0],[1,1,1],[0,0,0]]
 };
-const COLORS = {I:'#a2d2ff', O:'#fdfd96', S:'#b1ffb1', Z:'#ffb1b1', J:'#c1c1ff', L:'#ffcc99', T:'#e1e1e1'};
 
+// ミノごとのパステルカラー
+const COLORS = {
+    I:'var(--pastel-i)', O:'var(--pastel-o)', S:'var(--pastel-s)', 
+    Z:'var(--pastel-z)', J:'var(--pastel-j)', L:'var(--pastel-l)', T:'var(--pastel-t)'
+};
+
+/**
+ * ゲーム状態管理
+ */
 const cvs = document.getElementById('canvas');
 const ctx = cvs.getContext('2d');
-cvs.width = COLS * BLOCK; cvs.height = ROWS * BLOCK;
+cvs.width = COLS * BLOCK;
+cvs.height = ROWS * BLOCK;
 
+// ゲーム盤面（NULLで初期化）
 let grid = Array.from({length: ROWS}, () => Array(COLS).fill(null));
-let score = 0, over = false, paused = false, lastTime = 0, dropCounter = 0, speed = 500, levelTimer = 0;
-let piece = null;
+let score = 0;
+let over = false;
+let paused = false;
+let lastTime = 0;
+let dropCounter = 0;
+let speed = 500; // 初期落下速度(ms)
+let levelTimer = 0;
+let piece = null; // 現在操作中のミノ
 
+/**
+ * ミノ（ブロックの塊）クラス
+ */
 class Piece {
     constructor() {
         const types = Object.keys(SHAPES);
         this.type = types[Math.floor(Math.random() * types.length)];
         this.color = COLORS[this.type];
         this.matrix = SHAPES[this.type];
-        // 文字を埋め込む
+        
+        // 回転パターンをランダムに決定（0〜3回右回転）
+        const rCount = Math.floor(Math.random() * 4);
+        for(let i=0; i<rCount; i++) {
+            this.matrix = this.matrix[0].map((_, i) => this.matrix.map(row => row[i]).reverse());
+        }
+
+        // ミノの各マスに限定されたカタカナを埋め込む
         this.data = this.matrix.map(row => row.map(v => v ? CHARS[Math.floor(Math.random()*CHARS.length)] : null));
+        
+        // 初期位置（中央上部）
         this.x = Math.floor(COLS/2 - this.matrix[0].length/2);
-        this.y = 0;
+        this.y = 0; // 一番上から出現
     }
-    // 回転処理
+
+    // 回転処理（壁蹴り補正付き）
     rotate() {
         const newData = this.data[0].map((_, i) => this.data.map(row => row[i]).reverse());
         if (!collide(this.x, this.y, newData)) {
             this.data = newData;
-        } else if (!collide(this.x - 1, this.y, newData)) { // 壁蹴り補正(左)
+        } else if (!collide(this.x - 1, this.y, newData)) { // 左にずらして回転試行
             this.x--; this.data = newData;
-        } else if (!collide(this.x + 1, this.y, newData)) { // 壁蹴り補正(右)
+        } else if (!collide(this.x + 1, this.y, newData)) { // 右にずらして回転試行
             this.x++; this.data = newData;
         }
     }
 }
 
+/**
+ * 衝突判定
+ */
 function collide(px, py, pd) {
     for (let y = 0; y < pd.length; y++) {
         for (let x = 0; x < pd[y].length; x++) {
             if (pd[y][x]) {
-                let nx = px + x, ny = py + y;
+                let nx = px + x;
+                let ny = py + y;
+                // 壁、底、または既にブロックがある場所への衝突
                 if (nx < 0 || nx >= COLS || ny >= ROWS || (ny >= 0 && grid[ny][nx])) return true;
             }
         }
@@ -146,72 +215,130 @@ function collide(px, py, pd) {
     return false;
 }
 
+/**
+ * ミノを盤面に固定する
+ */
 function lock() {
     piece.data.forEach((row, dy) => row.forEach((char, dx) => {
         if (char) {
-            if (piece.y + dy < 0) over = true;
-            else grid[piece.y + dy][piece.x + dx] = {char, color: piece.color};
+            let finalY = piece.y + dy;
+            // 一番上（Y=0未満）で固定されたらゲームオーバー
+            if (finalY < 0) {
+                over = true;
+            } else {
+                grid[finalY][piece.x + dx] = {char, color: piece.color};
+            }
         }
     }));
-    if (over) { document.getElementById('modal').style.display = 'flex'; return; }
+
+    if (over) {
+        document.getElementById('modal').style.display = 'flex';
+        return;
+    }
+
     checkLines();
     spawn();
 }
 
+/**
+ * ライン消去と単語判定
+ */
 function checkLines() {
+    let linesCleared = 0;
     for (let y = 0; y < ROWS; y++) {
+        // 一列すべて埋まっているか
         if (grid[y].every(cell => cell !== null)) {
+            linesCleared++;
             const lineStr = grid[y].map(c => c.char).join("");
+            
+            // 単語スキャン
             WORDS.forEach(w => {
-                if (lineStr.includes(w)) {
-                    score += (w.length * 10);
+                // 同じ単語が複数含まれる場合も考慮
+                let startIdx = 0;
+                while((startIdx = lineStr.indexOf(w, startIdx)) !== -1) {
+                    score += (w.length * 10); // 単語ボーナス
                     showGoldWord(w);
+                    startIdx += w.length;
                 }
             });
+
+            // ライン消去処理
             grid.splice(y, 1);
             grid.unshift(Array(COLS).fill(null));
-            score += 1000;
+            score += 1000; // ライン消去スコア
         }
     }
     document.getElementById('score-val').innerText = score;
 }
 
+/**
+ * 金色の単語エフェクト表示
+ */
 function showGoldWord(w) {
     const div = document.createElement('span');
     div.className = 'gold-msg';
     div.innerText = w;
     document.getElementById('word-overlay').appendChild(div);
+    // 3秒後に要素を削除
     setTimeout(() => div.remove(), 3000);
 }
 
-function spawn() { piece = new Piece(); }
+/**
+ * 新しいミノを生成
+ */
+function spawn() {
+    piece = new Piece();
+    // 出現した瞬間に衝突していたらゲームオーバー
+    if (collide(piece.x, piece.y, piece.data)) {
+        over = true;
+        document.getElementById('modal').style.display = 'flex';
+    }
+}
 
+/**
+ * プレイヤー入力処理
+ */
 function input(key) {
     if (over || paused) return;
     if (key === 'ArrowLeft' && !collide(piece.x - 1, piece.y, piece.data)) piece.x--;
     if (key === 'ArrowRight' && !collide(piece.x + 1, piece.y, piece.data)) piece.x++;
-    if (key === 'ArrowDown') drop();
-    if (key === 'ArrowUp' || key === 'Space') piece.rotate();
+    if (key === 'ArrowDown') drop(); // 手動落下
+    if (key === 'ArrowUp' || key === 'Space') piece.rotate(); // 回転
     draw();
 }
 
+/**
+ * 落下処理
+ */
 function drop() {
     if (!collide(piece.x, piece.y + 1, piece.data)) {
         piece.y++;
     } else {
-        lock();
+        lock(); // 接地したら固定
     }
-    dropCounter = 0;
+    dropCounter = 0; // 自動落下タイマーをリセット
 }
 
+/**
+ * 描画処理
+ */
 function draw() {
+    // 背景クリア
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, cvs.width, cvs.height);
-    // 盤面描画
+
+    // グリッド線を描画（うっすら）
+    ctx.strokeStyle = 'var(--grid-color)';
+    ctx.lineWidth = 0.5;
+    for(let x=0; x<=COLS; x++) { ctx.beginPath(); ctx.moveTo(x*BLOCK, 0); ctx.lineTo(x*BLOCK, cvs.height); ctx.stroke(); }
+    for(let y=0; y<=ROWS; y++) { ctx.beginPath(); ctx.moveTo(0, y*BLOCK); ctx.lineTo(cvs.width, y*BLOCK); ctx.stroke(); }
+
+    // 固定済みブロックを描画
     grid.forEach((row, y) => row.forEach((v, x) => {
         if (v) drawBlock(x, y, v.color, v.char);
     }));
-    // 操作ミノ描画
+
+    // 操作中ミノを描画
     if (piece) {
         piece.data.forEach((row, dy) => row.forEach((char, dx) => {
             if (char) drawBlock(piece.x + dx, piece.y + dy, piece.color, char);
@@ -219,34 +346,65 @@ function draw() {
     }
 }
 
+/**
+ * ブロック単体の描画
+ */
 function drawBlock(x, y, color, char) {
+    if (y < 0) return; // 画面外は描画しない
+    
+    // ブロック本体
     ctx.fillStyle = color;
     ctx.fillRect(x*BLOCK, y*BLOCK, BLOCK, BLOCK);
-    ctx.strokeStyle = 'rgba(0,0,0,0.3)';
-    ctx.strokeRect(x*BLOCK, y*BLOCK, BLOCK, BLOCK);
-    ctx.fillStyle = '#222';
-    ctx.font = 'bold 18px sans-serif';
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(char, x*BLOCK + BLOCK/2, y*BLOCK + BLOCK/2);
+    
+    // 立体感を出す枠線
+    ctx.strokeStyle = 'rgba(0,0,0,0.4)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x*BLOCK+1, y*BLOCK+1, BLOCK-2, BLOCK-2);
+    
+    // 文字描画
+    ctx.fillStyle = '#111'; // 文字色は濃いめで見やすく
+    ctx.font = 'bold 20px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(char, x*BLOCK + BLOCK/2, y*BLOCK + BLOCK/2 + 2); // わずかに下にずらして調整
 }
 
+/**
+ * ゲームループ
+ */
 function update(time = 0) {
     if (over || paused) return;
+    
     const dt = time - lastTime;
     lastTime = time;
     dropCounter += dt;
     levelTimer += dt;
-    if (levelTimer > 15000) { speed = Math.max(100, speed - 50); levelTimer = 0; }
+    
+    // 15秒ごとに速度アップ
+    if (levelTimer > 15000) {
+        speed = Math.max(80, speed - 40); // 最速80ms
+        levelTimer = 0;
+    }
+    
+    // 自動落下
     if (dropCounter > speed) drop();
+    
     draw();
     requestAnimationFrame(update);
 }
 
+// キーボードイベント
 window.addEventListener('keydown', e => {
-    if (e.code === 'Space') input('Space');
-    else input(e.code);
+    if (e.code === 'Space') {
+        input('Space');
+        e.preventDefault(); // スペースキーでのスクロール防止
+    } else if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code)) {
+        input(e.code);
+        e.preventDefault(); // 矢印キーでのスクロール防止
+    }
 });
 
+// 初期化
 spawn();
 requestAnimationFrame(update);
 </script>
