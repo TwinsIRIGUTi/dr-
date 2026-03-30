@@ -2,43 +2,51 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Dr.モツリス</title>
     <style>
         :root {
-            --bg-color: #121212; --gold: #ffcc00;
-            --p-i: #00dfff; --p-o: #ffff00; --p-s: #00ff00; --p-z: #ff4f4f; --p-j: #7f7fff; --p-l: #ff9f00; --p-t: #e0e0e0;
+            --bg-color: #0a0a0a; --gold: #fff000;
+            --p-i: #00ffff; --p-o: #ffff00; --p-s: #33ff33; --p-z: #ff3333; --p-j: #5555ff; --p-l: #ff9900; --p-t: #ffffff;
         }
         body {
             background: var(--bg-color); color: white; font-family: sans-serif;
-            display: flex; flex-direction: column; align-items: center; margin: 0; overflow: hidden; touch-action: none;
+            display: flex; flex-direction: column; align-items: center; margin: 0; padding: 0;
+            overflow: hidden; touch-action: none; height: 100vh;
         }
-        #game-wrapper { position: relative; }
-        h1 { margin: 10px 0; font-size: 28px; text-align: center; }
-        #game-container { position: relative; border: 4px solid #555; background: #000; display: none; }
+        #game-wrapper { width: 300px; display: flex; flex-direction: column; align-items: center; margin-top: 5px; }
+        h1 { margin: 2px 0; font-size: 20px; color: var(--gold); }
+        
+        #game-container { position: relative; border: 2px solid #888; background: #000; display: none; }
         #score-box {
-            position: absolute; top: 10px; left: 10px; z-index: 10; font-size: 19px; font-weight: bold;
-            background: rgba(0,0,0,0.8); padding: 5px 10px; border-radius: 4px;
+            position: absolute; top: 5px; left: 5px; z-index: 10; font-size: 14px; font-weight: bold;
+            background: rgba(0,0,0,0.8); padding: 2px 6px; border: 1px solid #666;
         }
         #word-overlay {
-            position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%);
+            position: absolute; top: 35%; left: 50%; transform: translate(-50%, -50%);
             z-index: 100; text-align: center; pointer-events: none; width: 100%;
         }
         .gold-msg {
-            color: var(--gold); font-size: 50px; font-weight: bold;
-            text-shadow: 0 0 15px rgba(255,200,0,0.8), 2px 2px 0 #000;
-            animation: fOU 3s forwards; display: block;
+            color: var(--gold); font-size: 36px; font-weight: bold;
+            text-shadow: 0 0 15px #fff, 2px 2px 2px #000; animation: fOU 2s forwards;
         }
         @keyframes fOU {
-            0% { opacity: 0; transform: scale(0.8) translateY(20px); }
-            15% { opacity: 1; transform: scale(1.1) translateY(0); }
+            0% { opacity: 0; transform: scale(0.5); }
+            20% { opacity: 1; transform: scale(1.1); }
             100% { opacity: 0; transform: translateY(-80px); }
         }
-        canvas { display: block; }
-        #controls-row { margin-top: 15px; display: none; gap: 12px; }
-        button.ctrl-btn { padding: 12px 24px; font-size: 20px; font-weight: bold; cursor: pointer; border-radius: 8px; border: none; background: #333; color: white; }
-        #title-screen { display: flex; flex-direction: column; justify-content: center; align-items: center; width: 300px; height: 600px; background: #000; border: 4px solid #555; }
-        #title-logo { font-size: 40px; font-weight: bold; color: var(--gold); text-shadow: 0 0 10px var(--gold); margin-bottom: 50px; }
-        #start-btn { padding: 15px 40px; font-size: 24px; background: #c0392b; color: white; border: none; border-radius: 10px; cursor: pointer; box-shadow: 0 5px 0 #8e2c22; }
+        canvas { display: block; background: #000; }
+        
+        #controls-row { width: 100%; display: none; grid-template-columns: repeat(4, 1fr); gap: 6px; padding: 10px; box-sizing: border-box; }
+        .ctrl-btn {
+            height: 60px; font-size: 22px; font-weight: bold; cursor: pointer; border-radius: 10px;
+            border: none; background: #444; color: white; box-shadow: 0 4px 0 #222;
+        }
+        .ctrl-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 #222; }
+        
+        #title-screen { display: flex; flex-direction: column; justify-content: center; align-items: center; width: 280px; height: 420px; background: #1a1a1a; border: 2px solid #555; border-radius: 10px; margin-top: 20px; }
+        #title-logo { font-size: 32px; font-weight: bold; color: var(--gold); text-shadow: 0 0 10px var(--gold); margin-bottom: 30px; }
+        #start-btn { padding: 15px 40px; font-size: 22px; background: #c0392b; color: white; border: none; border-radius: 30px; box-shadow: 0 4px 0 #7e261d; }
         #modal { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); flex-direction: column; justify-content: center; align-items: center; z-index: 200; }
     </style>
 </head>
@@ -49,25 +57,25 @@
             <button id="start-btn" onclick="startGame()">START</button>
         </div>
         <div id="game-container">
-            <h1>Dr.モツリス</h1>
-            <div id="score-box">スコア: <span id="score-val">0</span></div>
+            <div id="score-box">SCORE: <span id="score-val">0</span></div>
             <div id="word-overlay"></div>
             <canvas id="canvas"></canvas>
             <div id="modal">
-                <h2>GAME OVER</h2>
-                <button class="ctrl-btn" onclick="location.reload()">もう一度</button>
+                <h2 style="color:#ff4444">GAME OVER</h2>
+                <button class="ctrl-btn" style="width:120px" onclick="location.reload()">RETRY</button>
             </div>
         </div>
     </div>
     <div id="controls-row">
-        <button class="ctrl-btn" onclick="handleInput('ArrowLeft')">←</button>
-        <button class="ctrl-btn" onclick="handleInput('ArrowUp')" style="background:#8e44ad;">回転</button>
-        <button class="ctrl-btn" onclick="handleInput('ArrowRight')">→</button>
-        <button class="ctrl-btn" onclick="handleInput('ArrowDown')">↓</button>
+        <button class="ctrl-btn" ontouchstart="handleInput('ArrowLeft')" mousedown="handleInput('ArrowLeft')">←</button>
+        <button class="ctrl-btn" ontouchstart="handleInput('ArrowUp')" mousedown="handleInput('ArrowUp')" style="background:#6c3483;">回</button>
+        <button class="ctrl-btn" ontouchstart="handleInput('ArrowRight')" mousedown="handleInput('ArrowRight')">→</button>
+        <button class="ctrl-btn" ontouchstart="handleInput('ArrowDown')" mousedown="handleInput('ArrowDown')">↓</button>
     </div>
 
 <script>
-const COLS = 10, ROWS = 20, BLOCK = 30, CHARS = "アイウオカガキコサシロスタダツナニクネハホマミメラリルレワンバブビドーズー".split("");
+const COLS = 10, ROWS = 18, BLOCK = 28;
+const CHARS = "アイウオカガキコサシロスタダツナニクネハホマミメラリルレワンバブビドーズー".split("");
 const WORDS = ["シロ","レバ","ガツ","コブクロ","ナンコツ","アブラ","ハツ","カシラ","ビール","ウメワリ","ブドウワリ","ウイスキー","サイダー","ツル","シンキ","タンナマ","オシンコ","ダイコン","ニコミ","ホネ","ツインズ"];
 const SHAPES = { I:[[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], O:[[1,1],[1,1]], S:[[0,1,1],[1,1,0],[0,0,0]], Z:[[1,1,0],[0,1,1],[0,0,0]], J:[[1,0,0],[1,1,1],[0,0,0]], L:[[0,0,1],[1,1,1],[0,0,0]], T:[[0,1,0],[1,1,1],[0,0,0]] };
 const COLORS = { I:'var(--p-i)', O:'var(--p-o)', S:'var(--p-s)', Z:'var(--p-z)', J:'var(--p-j)', L:'var(--p-l)', T:'var(--p-t)' };
@@ -87,18 +95,18 @@ const AE = {
         o.frequency.setValueAtTime(f, this.ctx.currentTime);
         g.gain.setValueAtTime(gVal, this.ctx.currentTime);
         g.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + dur);
-        o.start(); o.stop(this.ctx.currentTime + dur);
-        return o;
+        o.start(); o.stop(this.ctx.currentTime + dur); return o;
     },
     playSE(t) {
-        if (t==='lock') this.osc(120, 0.3, 0.2, 'triangle').frequency.exponentialRampToValueAtTime(40, this.ctx.currentTime + 0.1);
-        else if (t==='clear') this.osc(880, 0.2, 0.5);
-        else if (t==='word') this.osc(440, 0.1, 0.3, 'square').frequency.exponentialRampToValueAtTime(1760, this.ctx.currentTime + 0.3);
+        if (!this.ctx) return;
+        if (t==='lock') this.osc(100, 0.2, 0.1, 'triangle');
+        else if (t==='clear') this.osc(900, 0.15, 0.3);
+        else if (t==='word') this.osc(400, 0.1, 0.3, 'square').frequency.exponentialRampToValueAtTime(1200, this.ctx.currentTime + 0.3);
     },
     playBGM(l) {
         if (bgmInterval) clearInterval(bgmInterval);
         const t = [0.5, 0.4, 0.3][l], n = [[261, 329, 392], [329, 392, 493], [392, 493, 587]][l];
-        bgmInterval = setInterval(() => { if (!over && piece) this.osc(n[Math.floor(Math.random()*n.length)], 0.02, 0.1); }, t * 1000);
+        bgmInterval = setInterval(() => { if (!over && piece) this.osc(n[Math.floor(Math.random()*n.length)], 0.01, 0.1); }, t * 1000);
     }
 };
 
@@ -123,7 +131,7 @@ class Piece {
 function startGame() {
     AE.init(); document.getElementById('title-screen').style.display = 'none';
     document.getElementById('game-container').style.display = 'block';
-    document.getElementById('controls-row').style.display = 'flex';
+    document.getElementById('controls-row').style.display = 'grid';
     AE.playBGM(0); spawn(); requestAnimationFrame(update);
 }
 
@@ -141,7 +149,7 @@ function lock() {
 function splitAndSettle() {
     let m = false;
     for (let y = ROWS-2; y >= 0; y--) for (let x = 0; x < COLS; x++) if (grid[y][x] && !grid[y+1][x]) { grid[y+1][x]=grid[y][x]; grid[y][x]=null; m=true; }
-    if (m) setTimeout(splitAndSettle, 50); else checkLines();
+    if (m) setTimeout(splitAndSettle, 40); else checkLines();
 }
 
 function checkLines() {
@@ -155,8 +163,7 @@ function checkLines() {
     if (f) splitAndSettle(); else { isSettling = false; spawn(); }
 }
 
-function showGold(w) { const d = document.createElement('span'); d.className='gold-msg'; d.innerText=w; wordDiv.appendChild(d); setTimeout(()=>d.remove(), 3000); }
-
+function showGold(w) { const d = document.createElement('span'); d.className='gold-msg'; d.innerText=w; wordDiv.appendChild(d); setTimeout(()=>d.remove(), 2500); }
 function spawn() { piece = new Piece(); if (collide(piece.x, piece.y, piece.data)) { over=true; document.getElementById('modal').style.display='flex'; } }
 
 function handleInput(k) {
@@ -177,10 +184,21 @@ function draw() {
 }
 
 function drawBlock(x, y, col, char) {
-    ctx.fillStyle = col; ctx.fillRect(x*BLOCK, y*BLOCK, BLOCK, BLOCK);
-    ctx.strokeStyle = 'rgba(0,0,0,0.3)'; ctx.strokeRect(x*BLOCK+1, y*BLOCK+1, BLOCK-2, BLOCK-2);
-    ctx.fillStyle = '#111'; ctx.font = 'bold 20px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(char, x*BLOCK+BLOCK/2, y*BLOCK+BLOCK/2+2);
+    ctx.fillStyle = col;
+    ctx.fillRect(x*BLOCK+1, y*BLOCK+1, BLOCK-2, BLOCK-2);
+    
+    // ハイライトライン（明るさアップ）
+    ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x*BLOCK+4, y*BLOCK+4, BLOCK-8, BLOCK-8);
+
+    // 文字（視認性アップ）
+    ctx.font = 'bold 18px sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.strokeStyle = '#000'; ctx.lineWidth = 4;
+    ctx.strokeText(char, x*BLOCK+BLOCK/2, y*BLOCK+BLOCK/2);
+    ctx.fillStyle = '#fff';
+    ctx.fillText(char, x*BLOCK+BLOCK/2, y*BLOCK+BLOCK/2);
 }
 
 function update(t = 0) {
@@ -193,8 +211,6 @@ function update(t = 0) {
     }
     draw(); requestAnimationFrame(update);
 }
-
-window.addEventListener('keydown', e => { if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.code)) { handleInput(e.code); e.preventDefault(); } });
 </script>
 </body>
 </html>
