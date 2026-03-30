@@ -52,9 +52,9 @@
         </div>
     </div>
     <div id="controls-row">
-        <button class="ctrl-btn" ontouchstart="startInput('ArrowLeft')" ontouchend="stopInput()" onmousedown="startInput('ArrowLeft')" onmouseup="stopInput()">←</button>
-        <button class="ctrl-btn" ontouchstart="handleInput('ArrowUp')" onmousedown="handleInput('ArrowUp')" style="background:#6c3483;">回転</button>
-        <button class="ctrl-btn" ontouchstart="startInput('ArrowRight')" ontouchend="stopInput()" onmousedown="startInput('ArrowRight')" onmouseup="stopInput()">→</button>
+        <button class="ctrl-btn" ontouchstart="startInput(event, 'ArrowLeft')" ontouchend="stopInput(event)" onmousedown="startInput(event, 'ArrowLeft')" onmouseup="stopInput(event)">←</button>
+        <button class="ctrl-btn" ontouchstart="handleInput(event, 'ArrowUp')" onmousedown="handleInput(event, 'ArrowUp')" style="background:#6c3483;">回転</button>
+        <button class="ctrl-btn" ontouchstart="startInput(event, 'ArrowRight')" ontouchend="stopInput(event)" onmousedown="startInput(event, 'ArrowRight')" onmouseup="stopInput(event)">→</button>
     </div>
 
 <script>
@@ -70,14 +70,14 @@ cvs.width = COLS * BLOCK; cvs.height = ROWS * BLOCK;
 
 let grid = Array.from({length: ROWS}, () => Array(COLS).fill(null));
 let score = 0, linesCleared = 0, over = false, paused = false, lastTime = 0, dropCounter = 0, speed = 800, piece = null, isSettling = false, currentLevel = 0, bgmInterval = null;
-let lockTimer = 0, lockDelay = 500, inputTimer = 0, inputDir = null, inputRepeatDelay = 180, inputRepeatRate = 50;
+let lockTimer = 0, lockDelay = 500, inputTimer = 0, inputDir = null, inputRepeatDelay = 200, inputRepeatRate = 60;
 let soundEnabled = localStorage.getItem('motu_sound') !== 'OFF';
 
 const AE = {
     ctx: null,
-    init() { if (!this.ctx) { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); } if (this.ctx.state === 'suspended') this.ctx.resume(); },
+    init() { if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); if (this.ctx.state === 'suspended') this.ctx.resume(); },
     osc(f, gVal, dur, type='sine') {
-        if (!soundEnabled || paused || !this.ctx) return { stop: () => {}, frequency: { exponentialRampToValueAtTime: () => {} } };
+        if (!soundEnabled || paused || !this.ctx) return { stop: () => {} };
         const o = this.ctx.createOscillator(), g = this.ctx.createGain();
         o.type = type; o.connect(g); g.connect(this.ctx.destination);
         o.frequency.setValueAtTime(f, this.ctx.currentTime);
@@ -103,7 +103,7 @@ const AE = {
 };
 
 function toggleSound() { soundEnabled = !soundEnabled; localStorage.setItem('motu_sound', soundEnabled ? 'ON' : 'OFF'); document.getElementById('sound-toggle').innerText = `SOUND: ${soundEnabled ? 'ON' : 'OFF'}`; if (!soundEnabled && bgmInterval) clearInterval(bgmInterval); else if (soundEnabled && !over && !paused) AE.playBGM(currentLevel); }
-function togglePause() { if (over) return; paused = !paused; document.getElementById('pause-overlay').style.display = paused ? 'flex' : 'none'; document.getElementById('pause-btn').innerText = paused ? 'RESUME' : 'PAUSE'; if (paused) stopInput(); }
+function togglePause() { if (over) return; paused = !paused; document.getElementById('pause-overlay').style.display = paused ? 'flex' : 'none'; document.getElementById('pause-btn').innerText = paused ? 'RESUME' : 'PAUSE'; if (paused) inputDir = null; }
 function updateRankingDisplay() { const ranks = JSON.parse(localStorage.getItem('motu_ranks') || "[0,0,0]"); document.getElementById('ranking-list').innerHTML = ranks.map((s, i) => `<div class="ranking-item"><span>${i+1}位</span><span>${s} pts</span></div>`).join(""); }
 function saveScore(s) { let ranks = JSON.parse(localStorage.getItem('motu_ranks') || "[0,0,0]"); ranks.push(s); ranks.sort((a,b) => b-a); localStorage.setItem('motu_ranks', JSON.stringify(ranks.slice(0,3))); }
 function getRandomChar() { return Math.random() < 0.7 ? HIGH_FREQ[Math.floor(Math.random()*HIGH_FREQ.length)] : NORMAL_FREQ[Math.floor(Math.random()*NORMAL_FREQ.length)]; }
@@ -117,8 +117,8 @@ class Piece {
     rotate() {
         const size = this.data.length; const n = Array.from({ length: size }, () => Array(size).fill(null));
         for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) n[x][size - 1 - y] = this.data[y][x];
-        const offsets = [0, -1, 1, -2, 2];
-        for (let ox of offsets) { if (!collide(this.x + ox, this.y, n)) { this.x += ox; this.data = n; lockTimer = 0; return; } }
+        const kicks = [0, -1, 1, -2, 2];
+        for (let dx of kicks) { if (!collide(this.x + dx, this.y, n)) { this.x += dx; this.data = n; lockTimer = 0; return; } }
     }
 }
 
@@ -148,14 +148,15 @@ function checkLines() {
 
 function showGold(w) { const d = document.createElement('span'); d.className='gold-msg'; d.innerText=w; wordDiv.appendChild(d); setTimeout(()=>d.remove(), 2000); }
 function spawn() { piece = new Piece(); if (collide(piece.x, piece.y, piece.data)) triggerGameOver(); }
-function startInput(dir) { if(!paused && !over) { handleInput(dir); inputDir = dir; inputTimer = 0; } }
-function stopInput() { inputDir = null; }
-function handleInput(k) { if (over || paused || !piece || isSettling) return; if (k==='ArrowLeft' && !collide(piece.x-1, piece.y, piece.data)) { piece.x--; lockTimer = 0; } if (k==='ArrowRight' && !collide(piece.x+1, piece.y, piece.data)) { piece.x++; lockTimer = 0; } if (k==='ArrowUp') piece.rotate(); }
+
+function startInput(e, dir) { e.preventDefault(); if(!paused && !over) { handleInput(null, dir); inputDir = dir; inputTimer = 0; } }
+function stopInput(e) { if(e) e.preventDefault(); inputDir = null; }
+function handleInput(e, k) { if (e) e.preventDefault(); if (over || paused || !piece || isSettling) return; if (k==='ArrowLeft' && !collide(piece.x-1, piece.y, piece.data)) { piece.x--; lockTimer = 0; } if (k==='ArrowRight' && !collide(piece.x+1, piece.y, piece.data)) { piece.x++; lockTimer = 0; } if (k==='ArrowUp') piece.rotate(); }
 
 function update(t = 0) {
     if (over) return; const dt = t - lastTime; lastTime = t;
     if (!paused) {
-        if (inputDir) { inputTimer += dt; if (inputTimer > inputRepeatDelay) { inputTimer -= inputRepeatRate; handleInput(inputDir); } }
+        if (inputDir) { inputTimer += dt; if (inputTimer > inputRepeatDelay) { inputTimer -= inputRepeatRate; handleInput(null, inputDir); } }
         if (piece && !isSettling) {
             dropCounter += dt;
             if (dropCounter > speed) {
