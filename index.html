@@ -7,23 +7,25 @@
     <style>
         :root { --bg-color: #0a0a0a; --gold: #fff000; }
         body { background: var(--bg-color); color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; margin: 0; padding: 0; overflow: hidden; touch-action: none; height: 100vh; }
-        #game-wrapper { width: 320px; display: flex; flex-direction: column; align-items: center; margin-top: 10px; }
+        #game-wrapper { width: 360px; display: flex; flex-direction: column; align-items: center; margin-top: 10px; }
         #game-container { position: relative; border: 3px solid #888; background: #000; display: none; }
-        #score-box { position: absolute; top: 5px; left: 5px; z-index: 10; font-size: 16px; font-weight: bold; background: rgba(0,0,0,0.8); padding: 3px 8px; border: 1px solid #666; line-height: 1.2; pointer-events: none; }
-        #pause-btn { position: absolute; top: 5px; right: 5px; z-index: 20; background: #444; border: 1px solid #777; color: white; padding: 4px 10px; font-size: 12px; border-radius: 4px; cursor: pointer; }
+        #score-box { position: absolute; top: 5px; left: 5px; z-index: 10; font-size: 14px; font-weight: bold; background: rgba(0,0,0,0.8); padding: 3px 8px; border: 1px solid #666; pointer-events: none; }
+        #next-box { position: absolute; top: 5px; right: -70px; width: 60px; background: rgba(0,0,0,0.8); border: 2px solid #555; padding: 5px; text-align: center; }
+        .next-preview { width: 50px; height: 50px; margin-bottom: 5px; position: relative; }
+        #top-controls { position: absolute; top: 5px; right: 5px; z-index: 20; display: flex; gap: 5px; }
+        .top-btn { background: #444; border: 1px solid #777; color: white; padding: 4px 8px; font-size: 11px; border-radius: 4px; cursor: pointer; }
         #pause-overlay { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 15; justify-content: center; align-items: center; font-size: 40px; font-weight: bold; color: white; pointer-events: none; }
         #word-overlay { position: absolute; top: 35%; left: 50%; transform: translate(-50%, -50%); z-index: 100; text-align: center; pointer-events: none; width: 100%; }
         .gold-msg { color: var(--gold); font-size: 40px; font-weight: bold; text-shadow: 0 0 15px #fff, 2px 2px 2px #000; animation: fOU 2s forwards; display: block; }
         @keyframes fOU { 0% { opacity: 0; transform: scale(0.5); } 10% { opacity: 1; transform: scale(1.1); } 90% { opacity: 1; transform: scale(1.1); } 100% { opacity: 0; transform: translateY(-40px); } }
         canvas { display: block; background: #000; }
-        #controls-row { width: 100%; display: none; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 15px; box-sizing: border-box; }
-        .ctrl-btn { height: 70px; font-size: 26px; font-weight: bold; cursor: pointer; border-radius: 12px; border: none; background: #444; color: white; box-shadow: 0 5px 0 #222; -webkit-user-select: none; }
+        #controls-grid { width: 100%; display: none; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 15px; box-sizing: border-box; }
+        .ctrl-btn { height: 70px; font-size: 24px; font-weight: bold; cursor: pointer; border-radius: 12px; border: none; background: #444; color: white; box-shadow: 0 5px 0 #222; -webkit-user-select: none; }
         .ctrl-btn:active { transform: translateY(3px); box-shadow: 0 2px 0 #222; }
+        .drop-btn { background: #2e86c1; grid-column: 2; height: 60px; }
         #title-screen { position: relative; display: flex; flex-direction: column; justify-content: center; align-items: center; width: 300px; height: 480px; background: #1a1a1a; border: 3px solid #555; border-radius: 15px; margin-top: 10px; }
         #title-logo { font-size: 38px; font-weight: bold; color: var(--gold); text-shadow: 0 0 15px var(--gold); margin-bottom: 20px; }
-        #sound-toggle { position: absolute; top: 15px; right: 15px; background: #333; border: 1px solid #777; color: white; padding: 5px 10px; border-radius: 5px; font-size: 12px; cursor: pointer; }
         #ranking-box { width: 80%; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 10px; margin-bottom: 30px; font-size: 14px; color: #ddd; border: 1px solid #444; }
-        .ranking-item { display: flex; justify-content: space-between; margin: 5px 0; border-bottom: 1px solid #333; }
         #start-btn { padding: 18px 45px; font-size: 24px; background: #c0392b; color: white; border: none; border-radius: 40px; box-shadow: 0 5px 0 #7e261d; }
         #modal { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); flex-direction: column; justify-content: center; align-items: center; z-index: 200; }
     </style>
@@ -31,16 +33,19 @@
 <body>
     <div id="game-wrapper">
         <div id="title-screen">
-            <button id="sound-toggle" onclick="toggleSound()">SOUND: ON</button>
             <div id="title-logo">Dr.モツリス</div>
-            <div id="ranking-box">
-                <div style="text-align:center; color:var(--gold); margin-bottom:5px;">🏆 TOP RECORDS</div>
-                <div id="ranking-list"></div>
-            </div>
+            <div id="ranking-box"><div style="text-align:center; color:var(--gold); margin-bottom:5px;">🏆 TOP RECORDS</div><div id="ranking-list"></div></div>
             <button id="start-btn" onclick="startGame()">START</button>
         </div>
         <div id="game-container">
-            <button id="pause-btn" onclick="togglePause()">PAUSE</button>
+            <div id="top-controls">
+                <button class="top-btn" id="ingame-sound" onclick="toggleSound()">🔊 ON</button>
+                <button class="top-btn" onclick="togglePause()">PAUSE</button>
+            </div>
+            <div id="next-box">
+                <div style="font-size:10px; color:#aaa; margin-bottom:5px;">NEXT</div>
+                <canvas id="next-canvas" width="60" height="180"></canvas>
+            </div>
             <div id="pause-overlay">PAUSE</div>
             <div id="score-box">SCORE: <span id="score-val">0</span><br>LEVEL: <span id="lvl-val">0</span></div>
             <div id="word-overlay"></div>
@@ -51,10 +56,13 @@
             </div>
         </div>
     </div>
-    <div id="controls-row">
-        <button class="ctrl-btn" ontouchstart="startInput(event, 'ArrowLeft')" ontouchend="stopInput(event)" onmousedown="startInput(event, 'ArrowLeft')" onmouseup="stopInput(event)">←</button>
-        <button class="ctrl-btn" ontouchstart="handleInput(event, 'ArrowUp')" onmousedown="handleInput(event, 'ArrowUp')" style="background:#6c3483;">回転</button>
-        <button class="ctrl-btn" ontouchstart="startInput(event, 'ArrowRight')" ontouchend="stopInput(event)" onmousedown="startInput(event, 'ArrowRight')" onmouseup="stopInput(event)">→</button>
+    <div id="controls-grid">
+        <button class="ctrl-btn" onmousedown="startInput(event,'ArrowLeft')" ontouchstart="startInput(event,'ArrowLeft')" onmouseup="stopInput(event)" ontouchend="stopInput(event)">←</button>
+        <button class="ctrl-btn" style="background:#6c3483;" onmousedown="handleInput(event,'ArrowUp')" ontouchstart="handleInput(event,'ArrowUp')">回転</button>
+        <button class="ctrl-btn" onmousedown="startInput(event,'ArrowRight')" ontouchstart="startInput(event,'ArrowRight')" onmouseup="stopInput(event)" ontouchend="stopInput(event)">→</button>
+        <div></div>
+        <button class="ctrl-btn drop-btn" onmousedown="handleInput(event,'HardDrop')" ontouchstart="handleInput(event,'HardDrop')">落下</button>
+        <div></div>
     </div>
 
 <script>
@@ -65,12 +73,13 @@ const WORDS = ["シロ","レバ","ガツ","コブクロ","ナンコツ","アブ�
 const SHAPES = { I:[[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], O:[[1,1],[1,1]], S:[[0,1,1],[1,1,0],[0,0,0]], Z:[[1,1,0],[0,1,1],[0,0,0]], J:[[1,0,0],[1,1,1],[0,0,0]], L:[[0,0,1],[1,1,1],[0,0,0]], T:[[0,1,0],[1,1,1],[0,0,0]] };
 const COLORS = { I:'#00f0f0', O:'#f0f000', S:'#00f000', Z:'#f00000', J:'#0000f0', L:'#f0a000', T:'#a000f0' };
 
-const cvs = document.getElementById('canvas'), ctx = cvs.getContext('2d'), scoreSpan = document.getElementById('score-val'), lvlSpan = document.getElementById('lvl-val'), wordDiv = document.getElementById('word-overlay');
+const cvs = document.getElementById('canvas'), ctx = cvs.getContext('2d'), nextCvs = document.getElementById('next-canvas'), nextCtx = nextCvs.getContext('2d');
+const scoreSpan = document.getElementById('score-val'), lvlSpan = document.getElementById('lvl-val'), wordDiv = document.getElementById('word-overlay');
 cvs.width = COLS * BLOCK; cvs.height = ROWS * BLOCK;
 
 let grid = Array.from({length: ROWS}, () => Array(COLS).fill(null));
-let score = 0, linesCleared = 0, over = false, paused = false, lastTime = 0, dropCounter = 0, speed = 800, piece = null, isSettling = false, currentLevel = 0, bgmInterval = null;
-let lockTimer = 0, lockDelay = 500, inputTimer = 0, inputDir = null, inputRepeatDelay = 200, inputRepeatRate = 60;
+let score = 0, linesCleared = 0, over = false, paused = false, lastTime = 0, dropCounter = 0, speed = 800, piece = null, nextQueue = [], isSettling = false, currentLevel = 0, bgmInterval = null;
+let lockTimer = 0, lockDelay = 500, hardDropLockDelay = 1000, inputTimer = 0, inputDir = null, inputRepeatDelay = 200, inputRepeatRate = 60;
 let soundEnabled = localStorage.getItem('motu_sound') !== 'OFF';
 
 const AE = {
@@ -102,15 +111,22 @@ const AE = {
     }
 };
 
-function toggleSound() { soundEnabled = !soundEnabled; localStorage.setItem('motu_sound', soundEnabled ? 'ON' : 'OFF'); document.getElementById('sound-toggle').innerText = `SOUND: ${soundEnabled ? 'ON' : 'OFF'}`; if (!soundEnabled && bgmInterval) clearInterval(bgmInterval); else if (soundEnabled && !over && !paused) AE.playBGM(currentLevel); }
-function togglePause() { if (over) return; paused = !paused; document.getElementById('pause-overlay').style.display = paused ? 'flex' : 'none'; document.getElementById('pause-btn').innerText = paused ? 'RESUME' : 'PAUSE'; if (paused) inputDir = null; }
+function toggleSound() {
+    soundEnabled = !soundEnabled;
+    localStorage.setItem('motu_sound', soundEnabled ? 'ON' : 'OFF');
+    document.getElementById('ingame-sound').innerText = soundEnabled ? "🔊 ON" : "🔇 OFF";
+    if (!soundEnabled && bgmInterval) clearInterval(bgmInterval);
+    else if (soundEnabled && !over && !paused) AE.playBGM(currentLevel);
+}
+
+function togglePause() { if (over) return; paused = !paused; document.getElementById('pause-overlay').style.display = paused ? 'flex' : 'none'; if (paused) inputDir = null; }
 function updateRankingDisplay() { const ranks = JSON.parse(localStorage.getItem('motu_ranks') || "[0,0,0]"); document.getElementById('ranking-list').innerHTML = ranks.map((s, i) => `<div class="ranking-item"><span>${i+1}位</span><span>${s} pts</span></div>`).join(""); }
 function saveScore(s) { let ranks = JSON.parse(localStorage.getItem('motu_ranks') || "[0,0,0]"); ranks.push(s); ranks.sort((a,b) => b-a); localStorage.setItem('motu_ranks', JSON.stringify(ranks.slice(0,3))); }
 function getRandomChar() { return Math.random() < 0.7 ? HIGH_FREQ[Math.floor(Math.random()*HIGH_FREQ.length)] : NORMAL_FREQ[Math.floor(Math.random()*NORMAL_FREQ.length)]; }
 
 class Piece {
-    constructor() {
-        const types = Object.keys(SHAPES); this.type = types[Math.floor(Math.random()*types.length)]; this.color = COLORS[this.type];
+    constructor(type) {
+        this.type = type; this.color = COLORS[this.type];
         let m = SHAPES[this.type]; for(let i=0, r=Math.floor(Math.random()*4); i<r; i++) m = m[0].map((_, idx) => m.map(row => row[idx]).reverse());
         this.data = m.map(row => row.map(v => v ? getRandomChar() : null)); this.x = Math.floor(COLS/2 - m[0].length/2); this.y = 0;
     }
@@ -122,7 +138,7 @@ class Piece {
     }
 }
 
-function startGame() { AE.init(); document.getElementById('title-screen').style.display = 'none'; document.getElementById('game-container').style.display = 'block'; document.getElementById('controls-row').style.display = 'grid'; AE.playBGM(0); spawn(); requestAnimationFrame(update); }
+function startGame() { AE.init(); document.getElementById('title-screen').style.display = 'none'; document.getElementById('game-container').style.display = 'block'; document.getElementById('controls-grid').style.display = 'grid'; for(let i=0; i<4; i++) nextQueue.push(Object.keys(SHAPES)[Math.floor(Math.random()*7)]); spawn(); requestAnimationFrame(update); AE.playBGM(0); }
 function collide(px, py, pd) { return pd.some((row, dy) => row.some((char, dx) => char && (px+dx<0 || px+dx>=COLS || py+dy>=ROWS || (py+dy>=0 && grid[py+dy][px+dx])))); }
 function lock() { AE.playSE('lock'); piece.data.forEach((row, dy) => row.forEach((char, dx) => { if (char) { if (piece.y+dy<0) triggerGameOver(); else grid[piece.y+dy][piece.x+dx] = {char, color: piece.color}; } })); piece = null; if (!over) { isSettling = true; splitAndSettle(); } }
 function triggerGameOver() { if (over) return; over = true; AE.playSE('die'); saveScore(score); document.getElementById('modal').style.display = 'flex'; if (bgmInterval) clearInterval(bgmInterval); }
@@ -142,16 +158,43 @@ function checkLines() {
             grid.splice(y, 1); grid.unshift(Array(COLS).fill(null)); score += 1000;
         }
     }
-    if (count > 0) { linesCleared += count; const newLvl = Math.floor(linesCleared / 10); if (newLvl > currentLevel) { currentLevel = newLvl; speed = Math.max(100, 800 - (currentLevel * 70)); AE.playSE('levelup'); AE.playBGM(currentLevel); } }
+    if (count > 0) {
+        linesCleared += count;
+        const newLvl = Math.floor(linesCleared / 10);
+        if (newLvl > currentLevel) {
+            currentLevel = newLvl;
+            speed = Math.max(80, 800 - (currentLevel * 80)); // 10ライン毎に確実に速度アップ
+            AE.playSE('levelup'); AE.playBGM(currentLevel);
+        }
+    }
     scoreSpan.innerText = score; lvlSpan.innerText = currentLevel; if (f) splitAndSettle(); else { isSettling = false; spawn(); }
 }
 
 function showGold(w) { const d = document.createElement('span'); d.className='gold-msg'; d.innerText=w; wordDiv.appendChild(d); setTimeout(()=>d.remove(), 2000); }
-function spawn() { piece = new Piece(); if (collide(piece.x, piece.y, piece.data)) triggerGameOver(); }
+function spawn() { piece = new Piece(nextQueue.shift()); nextQueue.push(Object.keys(SHAPES)[Math.floor(Math.random()*7)]); if (collide(piece.x, piece.y, piece.data)) triggerGameOver(); drawNext(); }
 
-function startInput(e, dir) { e.preventDefault(); if(!paused && !over) { handleInput(null, dir); inputDir = dir; inputTimer = 0; } }
+function drawNext() {
+    nextCtx.clearRect(0,0,60,180);
+    nextQueue.forEach((type, i) => {
+        const m = SHAPES[type]; nextCtx.fillStyle = COLORS[type];
+        m.forEach((row, dy) => row.forEach((v, dx) => {
+            if(v) nextCtx.fillRect(dx*12 + 10, dy*12 + i*50 + 10, 10, 10);
+        }));
+    });
+}
+
+function startInput(e, dir) { if(e) e.preventDefault(); if(!paused && !over) { handleInput(null, dir); inputDir = dir; inputTimer = 0; } }
 function stopInput(e) { if(e) e.preventDefault(); inputDir = null; }
-function handleInput(e, k) { if (e) e.preventDefault(); if (over || paused || !piece || isSettling) return; if (k==='ArrowLeft' && !collide(piece.x-1, piece.y, piece.data)) { piece.x--; lockTimer = 0; } if (k==='ArrowRight' && !collide(piece.x+1, piece.y, piece.data)) { piece.x++; lockTimer = 0; } if (k==='ArrowUp') piece.rotate(); }
+function handleInput(e, k) {
+    if (e) e.preventDefault(); if (over || paused || !piece || isSettling) return;
+    if (k==='ArrowLeft' && !collide(piece.x-1, piece.y, piece.data)) { piece.x--; lockTimer = 0; }
+    if (k==='ArrowRight' && !collide(piece.x+1, piece.y, piece.data)) { piece.x++; lockTimer = 0; }
+    if (k==='ArrowUp') piece.rotate();
+    if (k==='HardDrop') {
+        while(!collide(piece.x, piece.y+1, piece.data)) piece.y++;
+        lockTimer = -500; // ハードドロップ直後は猶予を多めに（1秒）
+    }
+}
 
 function update(t = 0) {
     if (over) return; const dt = t - lastTime; lastTime = t;
@@ -159,10 +202,15 @@ function update(t = 0) {
         if (inputDir) { inputTimer += dt; if (inputTimer > inputRepeatDelay) { inputTimer -= inputRepeatRate; handleInput(null, inputDir); } }
         if (piece && !isSettling) {
             dropCounter += dt;
+            const currentLockDelay = lockTimer < 0 ? hardDropLockDelay : lockDelay;
             if (dropCounter > speed) {
                 if (!collide(piece.x, piece.y+1, piece.data)) { piece.y++; dropCounter = 0; lockTimer = 0; } 
-                else { lockTimer += dt; if (lockTimer > lockDelay) { lock(); lockTimer = 0; } }
-            } else if (collide(piece.x, piece.y+1, piece.data)) { lockTimer += dt; if (lockTimer > lockDelay) { lock(); lockTimer = 0; } }
+                else { lockTimer += dt; if (lockTimer > currentLockDelay) lock(); }
+            } else if (collide(piece.x, piece.y+1, piece.data)) {
+                lockTimer += (lockTimer < 0) ? dt : dt; // 負の値（ハードドロップ後）からのカウントアップ
+                if (lockTimer > (lockTimer < 0 ? 0 : currentLockDelay)) lock();
+                if (lockTimer < 0 && lockTimer + dt >= 0) lockTimer = 0; // 猶予モード開始
+            }
         }
     }
     draw(); requestAnimationFrame(update);
@@ -177,14 +225,13 @@ function draw() {
 function drawBlock(x, y, col, char) {
     const px = x * BLOCK, py = y * BLOCK; ctx.fillStyle = col; ctx.fillRect(px, py, BLOCK, BLOCK);
     ctx.fillStyle = "rgba(255,255,255,0.4)"; ctx.fillRect(px, py, BLOCK, 2); ctx.fillRect(px, py, 2, BLOCK);
-    ctx.fillStyle = "rgba(0,0,0,0.3)"; ctx.fillRect(px + BLOCK - 2, py, 2, BLOCK); ctx.fillRect(px, py + BLOCK - 2, BLOCK, 2);
     ctx.font = 'bold 20px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.strokeStyle = '#000'; ctx.lineWidth = 3; ctx.strokeText(char, px + BLOCK / 2, py + BLOCK / 2);
     ctx.fillStyle = '#fff'; ctx.fillText(char, px + BLOCK / 2, py + BLOCK / 2);
 }
 
 updateRankingDisplay();
-document.getElementById('sound-toggle').innerText = `SOUND: ${soundEnabled ? 'ON' : 'OFF'}`;
+document.getElementById('ingame-sound').innerText = soundEnabled ? "🔊 ON" : "🔇 OFF";
 </script>
 </body>
 </html>
