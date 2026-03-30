@@ -2,11 +2,20 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Dr.モツリス</title>
     <style>
         :root { --bg-color: #0a0a0a; --gold: #fff000; }
-        body { background: var(--bg-color); color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; margin: 0; padding: 0; overflow: hidden; touch-action: none; height: 100vh; }
+        /* 画面の拡大・スクロールを完全に禁止 */
+        html, body { 
+            position: fixed;
+            overflow: hidden;
+            width: 100%;
+            height: 100%;
+            touch-action: none; 
+            -webkit-text-size-adjust: 100%;
+        }
+        body { background: var(--bg-color); color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; margin: 0; padding: 0; }
         #game-wrapper { width: 360px; display: flex; flex-direction: column; align-items: center; margin-top: 10px; }
         #game-container { position: relative; border: 3px solid #888; background: #000; display: none; }
         #score-box { position: absolute; top: 5px; left: 5px; z-index: 10; font-size: 14px; font-weight: bold; background: rgba(0,0,0,0.8); padding: 3px 8px; border: 1px solid #666; pointer-events: none; }
@@ -77,6 +86,19 @@
     </div>
 
 <script>
+// --- スマホズーム対策 ---
+document.addEventListener('touchstart', (e) => {
+    if (e.touches.length > 1) e.preventDefault(); // ピンチズーム禁止
+}, { passive: false });
+
+let lastTouchEnd = 0;
+document.addEventListener('touchend', (e) => {
+    const now = (new Date()).getTime();
+    if (now - lastTouchEnd <= 300) e.preventDefault(); // ダブルタップズーム禁止
+    lastTouchEnd = now;
+}, false);
+
+// --- ゲーム定数 ---
 const COLS = 10, ROWS = 18, BLOCK = 32;
 const HIGH_FREQ = "シロレバガツハツタンナマオコニコ".split("");
 const NORMAL_FREQ = "アイウオカキサスタダニクネホマミメラリルレワンバブビドーズー".split("");
@@ -133,15 +155,12 @@ function toggleSound() {
     document.getElementById('ingame-sound').innerText = soundEnabled ? "🔊 ON" : "🔇 OFF";
     if (!soundEnabled) clearInterval(bgmInterval); else AE.playBGM();
 }
-
 function togglePause() { if (over) return; paused = !paused; document.getElementById('pause-overlay').style.display = paused ? 'flex' : 'none'; if (paused) inputDir = null; }
-
 function loadStats() {
     document.getElementById('best-score').innerText = localStorage.getItem('motu_best_score') || 0;
     document.getElementById('best-words').innerText = localStorage.getItem('motu_best_words') || 0;
     document.getElementById('best-level').innerText = localStorage.getItem('motu_best_level') || 0;
 }
-
 function saveStats() {
     const bScore = Math.max(localStorage.getItem('motu_best_score') || 0, score);
     const bWords = Math.max(localStorage.getItem('motu_best_words') || 0, totalWordsCount);
@@ -201,13 +220,12 @@ function checkMatches() {
         const newLvl = Math.floor(linesCleared / 10);
         if (newLvl > currentLevel) {
             currentLevel = newLvl;
-            // 加速ロジック：Lv50を限界(1ms)に設定
             if (currentLevel < 35) {
-                speed = Math.max(30, 800 - (currentLevel * 22)); // 一般的な限界
+                speed = Math.max(30, 800 - (currentLevel * 22));
             } else if (currentLevel < 50) {
-                speed = Math.max(1, 30 - (currentLevel - 35) * 2); // ガチ勢・神の領域
+                speed = Math.max(1, 30 - (currentLevel - 35) * 2);
             } else {
-                speed = 1; // 物理的限界
+                speed = 1;
             }
             AE.playSE('levelup'); AE.playBGM();
         }
