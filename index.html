@@ -9,7 +9,9 @@
         body { background: var(--bg-color); color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; margin: 0; padding: 0; overflow: hidden; touch-action: none; height: 100vh; }
         #game-wrapper { width: 320px; display: flex; flex-direction: column; align-items: center; margin-top: 10px; }
         #game-container { position: relative; border: 3px solid #888; background: #000; display: none; }
-        #score-box { position: absolute; top: 5px; left: 5px; z-index: 10; font-size: 16px; font-weight: bold; background: rgba(0,0,0,0.8); padding: 3px 8px; border: 1px solid #666; line-height: 1.2; }
+        #score-box { position: absolute; top: 5px; left: 5px; z-index: 10; font-size: 16px; font-weight: bold; background: rgba(0,0,0,0.8); padding: 3px 8px; border: 1px solid #666; line-height: 1.2; pointer-events: none; }
+        #pause-btn { position: absolute; top: 5px; right: 5px; z-index: 20; background: #444; border: 1px solid #777; color: white; padding: 4px 10px; font-size: 12px; border-radius: 4px; cursor: pointer; }
+        #pause-overlay { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 15; justify-content: center; align-items: center; font-size: 40px; font-weight: bold; color: white; pointer-events: none; }
         #word-overlay { position: absolute; top: 35%; left: 50%; transform: translate(-50%, -50%); z-index: 100; text-align: center; pointer-events: none; width: 100%; }
         .gold-msg { color: var(--gold); font-size: 40px; font-weight: bold; text-shadow: 0 0 15px #fff, 2px 2px 2px #000; animation: fOU 2s forwards; display: block; }
         @keyframes fOU { 0% { opacity: 0; transform: scale(0.5); } 10% { opacity: 1; transform: scale(1.1); } 90% { opacity: 1; transform: scale(1.1); } 100% { opacity: 0; transform: translateY(-40px); } }
@@ -38,10 +40,9 @@
             <button id="start-btn" onclick="startGame()">START</button>
         </div>
         <div id="game-container">
-            <div id="score-box">
-                SCORE: <span id="score-val">0</span><br>
-                LEVEL: <span id="lvl-val">0</span>
-            </div>
+            <button id="pause-btn" onclick="togglePause()">PAUSE</button>
+            <div id="pause-overlay">PAUSE</div>
+            <div id="score-box">SCORE: <span id="score-val">0</span><br>LEVEL: <span id="lvl-val">0</span></div>
             <div id="word-overlay"></div>
             <canvas id="canvas"></canvas>
             <div id="modal">
@@ -68,17 +69,15 @@ const cvs = document.getElementById('canvas'), ctx = cvs.getContext('2d'), score
 cvs.width = COLS * BLOCK; cvs.height = ROWS * BLOCK;
 
 let grid = Array.from({length: ROWS}, () => Array(COLS).fill(null));
-let score = 0, linesCleared = 0, over = false, lastTime = 0, dropCounter = 0, speed = 800, piece = null, isSettling = false, currentLevel = 0, bgmInterval = null;
-let lockTimer = 0, lockDelay = 500;
-let inputTimer = 0, inputDir = null, inputRepeatDelay = 180, inputRepeatRate = 50;
-
+let score = 0, linesCleared = 0, over = false, paused = false, lastTime = 0, dropCounter = 0, speed = 800, piece = null, isSettling = false, currentLevel = 0, bgmInterval = null;
+let lockTimer = 0, lockDelay = 500, inputTimer = 0, inputDir = null, inputRepeatDelay = 180, inputRepeatRate = 50;
 let soundEnabled = localStorage.getItem('motu_sound') !== 'OFF';
 
 const AE = {
     ctx: null,
-    init() { if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); if (this.ctx.state === 'suspended') this.ctx.resume(); },
+    init() { if (!this.ctx) { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); } if (this.ctx.state === 'suspended') this.ctx.resume(); },
     osc(f, gVal, dur, type='sine') {
-        if (!soundEnabled) return { stop: () => {}, frequency: { exponentialRampToValueAtTime: () => {} } };
+        if (!soundEnabled || paused || !this.ctx) return { stop: () => {}, frequency: { exponentialRampToValueAtTime: () => {} } };
         const o = this.ctx.createOscillator(), g = this.ctx.createGain();
         o.type = type; o.connect(g); g.connect(this.ctx.destination);
         o.frequency.setValueAtTime(f, this.ctx.currentTime);
@@ -87,27 +86,24 @@ const AE = {
         o.start(); o.stop(this.ctx.currentTime + dur); return o;
     },
     playSE(t) {
-        if (!this.ctx || !soundEnabled) return;
+        if (!soundEnabled || paused || !this.ctx) return;
         if (t==='lock') this.osc(120, 0.2, 0.1, 'triangle');
         else if (t==='clear') this.osc(800, 0.15, 0.4);
         else if (t==='word') this.osc(440, 0.1, 0.3, 'square').frequency.exponentialRampToValueAtTime(1320, this.ctx.currentTime + 0.3);
         else if (t==='die') { const o = this.osc(330, 0.2, 0.8, 'square'); o.frequency.exponentialRampToValueAtTime(110, this.ctx.currentTime + 0.8); }
-        else if (t==='levelup') {
-            [523.25, 659.25, 783.99].forEach((f, i) => {
-                setTimeout(() => this.osc(f, 0.1, 0.2, 'sine'), i * 100);
-            });
-        }
+        else if (t==='levelup') { [523.25, 659.25, 783.99].forEach((f, i) => { setTimeout(() => this.osc(f, 0.1, 0.2, 'sine'), i * 100); }); }
     },
     playBGM(l) {
         if (bgmInterval) clearInterval(bgmInterval);
         if (!soundEnabled) return;
         const speedIdx = Math.min(2, Math.floor(l / 5));
         const t = [0.5, 0.4, 0.35][speedIdx], n = [[261, 329, 392], [329, 392, 493], [392, 493, 587]][speedIdx];
-        bgmInterval = setInterval(() => { if (!over && piece && !isSettling && soundEnabled) this.osc(n[Math.floor(Math.random()*n.length)], 0.015, 0.12, 'square'); }, t * 1000);
+        bgmInterval = setInterval(() => { if (!over && !paused && piece && !isSettling && soundEnabled) this.osc(n[Math.floor(Math.random()*n.length)], 0.015, 0.12, 'square'); }, t * 1000);
     }
 };
 
-function toggleSound() { soundEnabled = !soundEnabled; localStorage.setItem('motu_sound', soundEnabled ? 'ON' : 'OFF'); document.getElementById('sound-toggle').innerText = `SOUND: ${soundEnabled ? 'ON' : 'OFF'}`; }
+function toggleSound() { soundEnabled = !soundEnabled; localStorage.setItem('motu_sound', soundEnabled ? 'ON' : 'OFF'); document.getElementById('sound-toggle').innerText = `SOUND: ${soundEnabled ? 'ON' : 'OFF'}`; if (!soundEnabled && bgmInterval) clearInterval(bgmInterval); else if (soundEnabled && !over && !paused) AE.playBGM(currentLevel); }
+function togglePause() { if (over) return; paused = !paused; document.getElementById('pause-overlay').style.display = paused ? 'flex' : 'none'; document.getElementById('pause-btn').innerText = paused ? 'RESUME' : 'PAUSE'; if (paused) stopInput(); }
 function updateRankingDisplay() { const ranks = JSON.parse(localStorage.getItem('motu_ranks') || "[0,0,0]"); document.getElementById('ranking-list').innerHTML = ranks.map((s, i) => `<div class="ranking-item"><span>${i+1}位</span><span>${s} pts</span></div>`).join(""); }
 function saveScore(s) { let ranks = JSON.parse(localStorage.getItem('motu_ranks') || "[0,0,0]"); ranks.push(s); ranks.sort((a,b) => b-a); localStorage.setItem('motu_ranks', JSON.stringify(ranks.slice(0,3))); }
 function getRandomChar() { return Math.random() < 0.7 ? HIGH_FREQ[Math.floor(Math.random()*HIGH_FREQ.length)] : NORMAL_FREQ[Math.floor(Math.random()*NORMAL_FREQ.length)]; }
@@ -119,17 +115,17 @@ class Piece {
         this.data = m.map(row => row.map(v => v ? getRandomChar() : null)); this.x = Math.floor(COLS/2 - m[0].length/2); this.y = 0;
     }
     rotate() {
-        const n = this.data[0].map((_, i) => this.data.map(row => row[i]).reverse());
-        if (!collide(this.x, this.y, n)) { this.data = n; lockTimer = 0; }
-        else if (!collide(this.x-1, this.y, n)) { this.x--; this.data = n; lockTimer = 0; }
-        else if (!collide(this.x+1, this.y, n)) { this.x++; this.data = n; lockTimer = 0; }
+        const size = this.data.length; const n = Array.from({ length: size }, () => Array(size).fill(null));
+        for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) n[x][size - 1 - y] = this.data[y][x];
+        const offsets = [0, -1, 1, -2, 2];
+        for (let ox of offsets) { if (!collide(this.x + ox, this.y, n)) { this.x += ox; this.data = n; lockTimer = 0; return; } }
     }
 }
 
 function startGame() { AE.init(); document.getElementById('title-screen').style.display = 'none'; document.getElementById('game-container').style.display = 'block'; document.getElementById('controls-row').style.display = 'grid'; AE.playBGM(0); spawn(); requestAnimationFrame(update); }
 function collide(px, py, pd) { return pd.some((row, dy) => row.some((char, dx) => char && (px+dx<0 || px+dx>=COLS || py+dy>=ROWS || (py+dy>=0 && grid[py+dy][px+dx])))); }
 function lock() { AE.playSE('lock'); piece.data.forEach((row, dy) => row.forEach((char, dx) => { if (char) { if (piece.y+dy<0) triggerGameOver(); else grid[piece.y+dy][piece.x+dx] = {char, color: piece.color}; } })); piece = null; if (!over) { isSettling = true; splitAndSettle(); } }
-function triggerGameOver() { if (over) return; over = true; AE.playSE('die'); saveScore(score); document.getElementById('modal').style.display = 'flex'; }
+function triggerGameOver() { if (over) return; over = true; AE.playSE('die'); saveScore(score); document.getElementById('modal').style.display = 'flex'; if (bgmInterval) clearInterval(bgmInterval); }
 function splitAndSettle() { let m = false; for (let y = ROWS-2; y >= 0; y--) for (let x = 0; x < COLS; x++) if (grid[y][x] && !grid[y+1][x]) { grid[y+1][x]=grid[y][x]; grid[y][x]=null; m=true; } if (m) setTimeout(splitAndSettle, 40); else checkLines(); }
 
 function checkLines() {
@@ -146,47 +142,39 @@ function checkLines() {
             grid.splice(y, 1); grid.unshift(Array(COLS).fill(null)); score += 1000;
         }
     }
-    if (count > 0) {
-        linesCleared += count;
-        const newLvl = Math.floor(linesCleared / 10);
-        if (newLvl > currentLevel) {
-            currentLevel = newLvl;
-            speed = Math.max(100, 800 - (currentLevel * 70));
-            AE.playSE('levelup'); // レベルアップSE再生
-            AE.playBGM(currentLevel);
-        }
-    }
+    if (count > 0) { linesCleared += count; const newLvl = Math.floor(linesCleared / 10); if (newLvl > currentLevel) { currentLevel = newLvl; speed = Math.max(100, 800 - (currentLevel * 70)); AE.playSE('levelup'); AE.playBGM(currentLevel); } }
     scoreSpan.innerText = score; lvlSpan.innerText = currentLevel; if (f) splitAndSettle(); else { isSettling = false; spawn(); }
 }
 
 function showGold(w) { const d = document.createElement('span'); d.className='gold-msg'; d.innerText=w; wordDiv.appendChild(d); setTimeout(()=>d.remove(), 2000); }
 function spawn() { piece = new Piece(); if (collide(piece.x, piece.y, piece.data)) triggerGameOver(); }
-function startInput(dir) { handleInput(dir); inputDir = dir; inputTimer = 0; }
+function startInput(dir) { if(!paused && !over) { handleInput(dir); inputDir = dir; inputTimer = 0; } }
 function stopInput() { inputDir = null; }
-function handleInput(k) { if (over || !piece || isSettling) return; if (k==='ArrowLeft' && !collide(piece.x-1, piece.y, piece.data)) { piece.x--; lockTimer = 0; } if (k==='ArrowRight' && !collide(piece.x+1, piece.y, piece.data)) { piece.x++; lockTimer = 0; } if (k==='ArrowUp') piece.rotate(); draw(); }
+function handleInput(k) { if (over || paused || !piece || isSettling) return; if (k==='ArrowLeft' && !collide(piece.x-1, piece.y, piece.data)) { piece.x--; lockTimer = 0; } if (k==='ArrowRight' && !collide(piece.x+1, piece.y, piece.data)) { piece.x++; lockTimer = 0; } if (k==='ArrowUp') piece.rotate(); }
 
 function update(t = 0) {
     if (over) return; const dt = t - lastTime; lastTime = t;
-    if (inputDir) { inputTimer += dt; if (inputTimer > inputRepeatDelay) { inputTimer -= inputRepeatRate; handleInput(inputDir); } }
-    if (piece && !isSettling) {
-        dropCounter += dt;
-        if (dropCounter > speed) {
-            if (!collide(piece.x, piece.y+1, piece.data)) { piece.y++; dropCounter = 0; lockTimer = 0; } 
-            else { lockTimer += dt; if (lockTimer > lockDelay) { lock(); lockTimer = 0; } }
-        } else if (collide(piece.x, piece.y+1, piece.data)) { lockTimer += dt; if (lockTimer > lockDelay) { lock(); lockTimer = 0; } }
+    if (!paused) {
+        if (inputDir) { inputTimer += dt; if (inputTimer > inputRepeatDelay) { inputTimer -= inputRepeatRate; handleInput(inputDir); } }
+        if (piece && !isSettling) {
+            dropCounter += dt;
+            if (dropCounter > speed) {
+                if (!collide(piece.x, piece.y+1, piece.data)) { piece.y++; dropCounter = 0; lockTimer = 0; } 
+                else { lockTimer += dt; if (lockTimer > lockDelay) { lock(); lockTimer = 0; } }
+            } else if (collide(piece.x, piece.y+1, piece.data)) { lockTimer += dt; if (lockTimer > lockDelay) { lock(); lockTimer = 0; } }
+        }
     }
     draw(); requestAnimationFrame(update);
 }
 
 function draw() {
-    ctx.fillStyle = '#000'; ctx.fillRect(0, 0, cvs.width, cvs.height);
+    ctx.clearRect(0, 0, cvs.width, cvs.height); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, cvs.width, cvs.height);
     grid.forEach((row, y) => row.forEach((v, x) => v && drawBlock(x, y, v.color, v.char)));
     if (piece) piece.data.forEach((row, dy) => row.forEach((char, dx) => char && drawBlock(piece.x+dx, piece.y+dy, piece.color, char)));
 }
 
 function drawBlock(x, y, col, char) {
-    const px = x * BLOCK, py = y * BLOCK;
-    ctx.fillStyle = col; ctx.fillRect(px, py, BLOCK, BLOCK);
+    const px = x * BLOCK, py = y * BLOCK; ctx.fillStyle = col; ctx.fillRect(px, py, BLOCK, BLOCK);
     ctx.fillStyle = "rgba(255,255,255,0.4)"; ctx.fillRect(px, py, BLOCK, 2); ctx.fillRect(px, py, 2, BLOCK);
     ctx.fillStyle = "rgba(0,0,0,0.3)"; ctx.fillRect(px + BLOCK - 2, py, 2, BLOCK); ctx.fillRect(px, py + BLOCK - 2, BLOCK, 2);
     ctx.font = 'bold 20px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
