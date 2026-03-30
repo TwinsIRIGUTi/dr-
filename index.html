@@ -94,7 +94,6 @@ document.addEventListener('touchend', (e) => {
     lastTouchEnd = now;
 }, false);
 
-// 画面切り替え時に一時停止
 document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden" && !over && !paused) {
         paused = true;
@@ -116,7 +115,7 @@ cvs.width = COLS * BLOCK; cvs.height = ROWS * BLOCK;
 
 let grid = Array.from({length: ROWS}, () => Array(COLS).fill(null));
 let score = 0, totalWordsCount = 0, linesCleared = 0, over = false, paused = false, lastTime = 0, dropCounter = 0, speed = 800, piece = null, nextQueue = [], isSettling = false, currentLevel = 0, bgmInterval = null, bgmStep = 0;
-let lockTimer = 0, lockDelay = 500, hardDropLockDelay = 1000, inputTimer = 0, inputDir = null, comboCount = 0;
+let lockTimer = 0, lockDelay = 500, hardDropLockDelay = 1000, inputDir = null, comboCount = 0;
 let soundEnabled = localStorage.getItem('motu_sound') !== 'OFF';
 
 const AE = {
@@ -142,10 +141,16 @@ const AE = {
     playBGM() {
         if (bgmInterval) clearInterval(bgmInterval);
         if (!soundEnabled) return;
-        const melody = [659, 493, 523, 587, 523, 493, 440, 440, 523, 659, 587, 523, 493, 523, 587, 659, 523, 440, 440];
-        const tempo = Math.max(80, 200 - (currentLevel * 3.5));
+        
+        // 1: ファミコン風(Lv0-15), 2: テトリス風(Lv16-30), 3: オリジナル高難易度(Lv31-)
+        const bgm1 = [523, 659, 783, 659, 523, 659, 783, 659, 587, 698, 880, 698, 587, 698, 880, 698];
+        const bgm2 = [659, 493, 523, 587, 523, 493, 440, 440, 523, 659, 587, 523, 493, 523, 587, 659, 523, 440, 440];
+        const bgm3 = [440, 440, 880, 783, 659, 523, 587, 523, 440, 392, 440, 523, 587, 659, 440, 440];
+
+        const tempo = Math.max(70, 180 - (currentLevel * 3));
         bgmInterval = setInterval(() => {
             if (!over && !paused && piece && !isSettling && soundEnabled) {
+                let melody = currentLevel <= 15 ? bgm1 : (currentLevel <= 30 ? bgm2 : bgm3);
                 this.osc(melody[bgmStep % melody.length], 0.012, 0.15);
                 if (bgmStep % 4 === 0) this.osc(110, 0.015, 0.1, 'triangle');
                 bgmStep++;
@@ -216,7 +221,6 @@ function checkMatches() {
             foundAny = true; linesThisTurn++; 
         }
     }
-    // テトリスボーナス
     if (linesThisTurn >= 4) { score += 10000; showGold("TETRIS BONUS!"); }
 
     for (let x = 0; x < COLS; x++) {
@@ -230,14 +234,18 @@ function checkMatches() {
         for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) if (toDelete[y][x]) grid[y][x] = null;
         linesCleared += linesThisTurn;
         
-        // レベルアップ判定: 10ラインごと、または5000点獲得ごと
+        const oldBgmStage = currentLevel <= 15 ? 1 : (currentLevel <= 30 ? 2 : 3);
         const newLvl = Math.max(Math.floor(linesCleared / 10), Math.floor(score / 5000));
+        
         if (newLvl > currentLevel) {
             currentLevel = newLvl;
             if (currentLevel < 35) { speed = Math.max(30, 800 - (currentLevel * 22)); }
             else if (currentLevel < 50) { speed = Math.max(1, 30 - (currentLevel - 35) * 2); }
             else { speed = 1; }
-            AE.playSE('levelup'); AE.playBGM();
+            
+            const newBgmStage = currentLevel <= 15 ? 1 : (currentLevel <= 30 ? 2 : 3);
+            AE.playSE('levelup');
+            if (oldBgmStage !== newBgmStage) { AE.playBGM(); } // 段階が変わったときのみBGM再起動
         }
         scoreSpan.innerText = score; lvlSpan.innerText = currentLevel; setTimeout(processSettling, 150);
     } else { isSettling = false; spawn(); }
