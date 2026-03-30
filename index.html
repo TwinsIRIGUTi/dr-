@@ -7,46 +7,48 @@
     <style>
         :root {
             --bg-color: #0a0a0a; --gold: #fff000;
-            --p-i: #00ffff; --p-o: #ffff00; --p-s: #33ff33; --p-z: #ff3333; --p-j: #5555ff; --p-l: #ff9900; --p-t: #ffffff;
+            --p-i: #00f0f0; --p-o: #f0f000; --p-s: #00f000; --p-z: #f00000; --p-j: #0000f0; --p-l: #f0a000; --p-t: #a000f0;
         }
         body {
             background: var(--bg-color); color: white; font-family: sans-serif;
             display: flex; flex-direction: column; align-items: center; margin: 0; padding: 0;
             overflow: hidden; touch-action: none; height: 100vh;
         }
-        #game-wrapper { width: 300px; display: flex; flex-direction: column; align-items: center; margin-top: 5px; }
-        h1 { margin: 2px 0; font-size: 20px; color: var(--gold); }
+        #game-wrapper { width: 320px; display: flex; flex-direction: column; align-items: center; margin-top: 10px; }
+        h1 { margin: 5px 0; font-size: 24px; color: var(--gold); }
         
-        #game-container { position: relative; border: 2px solid #888; background: #000; display: none; }
+        #game-container { position: relative; border: 3px solid #888; background: #000; display: none; }
         #score-box {
-            position: absolute; top: 5px; left: 5px; z-index: 10; font-size: 14px; font-weight: bold;
-            background: rgba(0,0,0,0.8); padding: 2px 6px; border: 1px solid #666;
+            position: absolute; top: 5px; left: 5px; z-index: 10; font-size: 16px; font-weight: bold;
+            background: rgba(0,0,0,0.8); padding: 3px 8px; border: 1px solid #666;
         }
         #word-overlay {
             position: absolute; top: 35%; left: 50%; transform: translate(-50%, -50%);
             z-index: 100; text-align: center; pointer-events: none; width: 100%;
         }
         .gold-msg {
-            color: var(--gold); font-size: 36px; font-weight: bold;
-            text-shadow: 0 0 15px #fff, 2px 2px 2px #000; animation: fOU 2s forwards;
+            color: var(--gold); font-size: 40px; font-weight: bold;
+            text-shadow: 0 0 15px #fff, 2px 2px 2px #000; 
+            animation: fOU 2s forwards; display: block;
         }
         @keyframes fOU {
             0% { opacity: 0; transform: scale(0.5); }
-            20% { opacity: 1; transform: scale(1.1); }
-            100% { opacity: 0; transform: translateY(-80px); }
+            10% { opacity: 1; transform: scale(1.1); }
+            90% { opacity: 1; transform: scale(1.1); }
+            100% { opacity: 0; transform: translateY(-40px); }
         }
         canvas { display: block; background: #000; }
         
-        #controls-row { width: 100%; display: none; grid-template-columns: repeat(4, 1fr); gap: 6px; padding: 10px; box-sizing: border-box; }
+        #controls-row { width: 100%; display: none; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 15px; box-sizing: border-box; }
         .ctrl-btn {
-            height: 60px; font-size: 22px; font-weight: bold; cursor: pointer; border-radius: 10px;
-            border: none; background: #444; color: white; box-shadow: 0 4px 0 #222;
+            height: 70px; font-size: 26px; font-weight: bold; cursor: pointer; border-radius: 12px;
+            border: none; background: #444; color: white; box-shadow: 0 5px 0 #222;
         }
-        .ctrl-btn:active { transform: translateY(2px); box-shadow: 0 1px 0 #222; }
+        .ctrl-btn:active { transform: translateY(3px); box-shadow: 0 2px 0 #222; }
         
-        #title-screen { display: flex; flex-direction: column; justify-content: center; align-items: center; width: 280px; height: 420px; background: #1a1a1a; border: 2px solid #555; border-radius: 10px; margin-top: 20px; }
-        #title-logo { font-size: 32px; font-weight: bold; color: var(--gold); text-shadow: 0 0 10px var(--gold); margin-bottom: 30px; }
-        #start-btn { padding: 15px 40px; font-size: 22px; background: #c0392b; color: white; border: none; border-radius: 30px; box-shadow: 0 4px 0 #7e261d; }
+        #title-screen { display: flex; flex-direction: column; justify-content: center; align-items: center; width: 300px; height: 480px; background: #1a1a1a; border: 3px solid #555; border-radius: 15px; margin-top: 10px; }
+        #title-logo { font-size: 38px; font-weight: bold; color: var(--gold); text-shadow: 0 0 15px var(--gold); margin-bottom: 40px; }
+        #start-btn { padding: 18px 45px; font-size: 24px; background: #c0392b; color: white; border: none; border-radius: 40px; box-shadow: 0 5px 0 #7e261d; }
         #modal { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); flex-direction: column; justify-content: center; align-items: center; z-index: 200; }
     </style>
 </head>
@@ -62,20 +64,20 @@
             <canvas id="canvas"></canvas>
             <div id="modal">
                 <h2 style="color:#ff4444">GAME OVER</h2>
-                <button class="ctrl-btn" style="width:120px" onclick="location.reload()">RETRY</button>
+                <button class="ctrl-btn" style="width:140px" onclick="location.reload()">RETRY</button>
             </div>
         </div>
     </div>
     <div id="controls-row">
-        <button class="ctrl-btn" ontouchstart="handleInput('ArrowLeft')" mousedown="handleInput('ArrowLeft')">←</button>
-        <button class="ctrl-btn" ontouchstart="handleInput('ArrowUp')" mousedown="handleInput('ArrowUp')" style="background:#6c3483;">回</button>
-        <button class="ctrl-btn" ontouchstart="handleInput('ArrowRight')" mousedown="handleInput('ArrowRight')">→</button>
-        <button class="ctrl-btn" ontouchstart="handleInput('ArrowDown')" mousedown="handleInput('ArrowDown')">↓</button>
+        <button class="ctrl-btn" ontouchstart="handleInput('ArrowLeft')">←</button>
+        <button class="ctrl-btn" ontouchstart="handleInput('ArrowUp')" style="background:#6c3483;">回転</button>
+        <button class="ctrl-btn" ontouchstart="handleInput('ArrowRight')">→</button>
     </div>
 
 <script>
-const COLS = 10, ROWS = 18, BLOCK = 28;
-const CHARS = "アイウオカガキコサシロスタダツナニクネハホマミメラリルレワンバブビドーズー".split("");
+const COLS = 10, ROWS = 18, BLOCK = 32;
+const HIGH_FREQ = "シロレバガツハツタンナマオコニコ".split("");
+const NORMAL_FREQ = "アイウオカキサスタダニクネホマミメラリルレワンバブビドーズー".split("");
 const WORDS = ["シロ","レバ","ガツ","コブクロ","ナンコツ","アブラ","ハツ","カシラ","ビール","ウメワリ","ブドウワリ","ウイスキー","サイダー","ツル","シンキ","タンナマ","オシンコ","ダイコン","ニコミ","ホネ","ツインズ"];
 const SHAPES = { I:[[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], O:[[1,1],[1,1]], S:[[0,1,1],[1,1,0],[0,0,0]], Z:[[1,1,0],[0,1,1],[0,0,0]], J:[[1,0,0],[1,1,1],[0,0,0]], L:[[0,0,1],[1,1,1],[0,0,0]], T:[[0,1,0],[1,1,1],[0,0,0]] };
 const COLORS = { I:'var(--p-i)', O:'var(--p-o)', S:'var(--p-s)', Z:'var(--p-z)', J:'var(--p-j)', L:'var(--p-l)', T:'var(--p-t)' };
@@ -99,16 +101,24 @@ const AE = {
     },
     playSE(t) {
         if (!this.ctx) return;
-        if (t==='lock') this.osc(100, 0.2, 0.1, 'triangle');
-        else if (t==='clear') this.osc(900, 0.15, 0.3);
-        else if (t==='word') this.osc(400, 0.1, 0.3, 'square').frequency.exponentialRampToValueAtTime(1200, this.ctx.currentTime + 0.3);
+        if (t==='lock') this.osc(120, 0.2, 0.1, 'triangle');
+        else if (t==='clear') this.osc(800, 0.15, 0.4);
+        else if (t==='word') this.osc(440, 0.1, 0.3, 'square').frequency.exponentialRampToValueAtTime(1320, this.ctx.currentTime + 0.3);
+        else if (t==='die') {
+            const o = this.osc(330, 0.2, 0.8, 'square');
+            o.frequency.exponentialRampToValueAtTime(110, this.ctx.currentTime + 0.8);
+        }
     },
     playBGM(l) {
         if (bgmInterval) clearInterval(bgmInterval);
-        const t = [0.5, 0.4, 0.3][l], n = [[261, 329, 392], [329, 392, 493], [392, 493, 587]][l];
-        bgmInterval = setInterval(() => { if (!over && piece) this.osc(n[Math.floor(Math.random()*n.length)], 0.01, 0.1); }, t * 1000);
+        const t = [0.5, 0.4, 0.35][l], n = [[261, 329, 392], [329, 392, 493], [392, 493, 587]][l];
+        bgmInterval = setInterval(() => { if (!over && piece && !isSettling) this.osc(n[Math.floor(Math.random()*n.length)], 0.015, 0.12, 'square'); }, t * 1000);
     }
 };
+
+function getRandomChar() {
+    return Math.random() < 0.7 ? HIGH_FREQ[Math.floor(Math.random()*HIGH_FREQ.length)] : NORMAL_FREQ[Math.floor(Math.random()*NORMAL_FREQ.length)];
+}
 
 class Piece {
     constructor() {
@@ -117,7 +127,7 @@ class Piece {
         this.color = COLORS[this.type];
         let m = SHAPES[this.type];
         for(let i=0, r=Math.floor(Math.random()*4); i<r; i++) m = m[0].map((_, idx) => m.map(row => row[idx]).reverse());
-        this.data = m.map(row => row.map(v => v ? CHARS[Math.floor(Math.random()*CHARS.length)] : null));
+        this.data = m.map(row => row.map(v => v ? getRandomChar() : null));
         this.x = Math.floor(COLS/2 - m[0].length/2); this.y = 0;
     }
     rotate() {
@@ -141,9 +151,16 @@ function collide(px, py, pd) {
 
 function lock() {
     AE.playSE('lock');
-    piece.data.forEach((row, dy) => row.forEach((char, dx) => { if (char) { if (piece.y+dy<0) over=true; else grid[piece.y+dy][piece.x+dx] = {char, color: piece.color}; } }));
+    piece.data.forEach((row, dy) => row.forEach((char, dx) => { if (char) { if (piece.y+dy<0) triggerGameOver(); else grid[piece.y+dy][piece.x+dx] = {char, color: piece.color}; } }));
     piece = null;
-    if (over) document.getElementById('modal').style.display = 'flex'; else { isSettling = true; splitAndSettle(); }
+    if (!over) { isSettling = true; splitAndSettle(); }
+}
+
+function triggerGameOver() {
+    if (over) return;
+    over = true;
+    AE.playSE('die');
+    document.getElementById('modal').style.display = 'flex';
 }
 
 function splitAndSettle() {
@@ -163,14 +180,13 @@ function checkLines() {
     if (f) splitAndSettle(); else { isSettling = false; spawn(); }
 }
 
-function showGold(w) { const d = document.createElement('span'); d.className='gold-msg'; d.innerText=w; wordDiv.appendChild(d); setTimeout(()=>d.remove(), 2500); }
-function spawn() { piece = new Piece(); if (collide(piece.x, piece.y, piece.data)) { over=true; document.getElementById('modal').style.display='flex'; } }
+function showGold(w) { const d = document.createElement('span'); d.className='gold-msg'; d.innerText=w; wordDiv.appendChild(d); setTimeout(()=>d.remove(), 2000); }
+function spawn() { piece = new Piece(); if (collide(piece.x, piece.y, piece.data)) triggerGameOver(); }
 
 function handleInput(k) {
     if (over || !piece || isSettling) return;
     if (k==='ArrowLeft' && !collide(piece.x-1, piece.y, piece.data)) piece.x--;
     if (k==='ArrowRight' && !collide(piece.x+1, piece.y, piece.data)) piece.x++;
-    if (k==='ArrowDown') drop();
     if (k==='ArrowUp') piece.rotate();
     draw();
 }
@@ -184,21 +200,11 @@ function draw() {
 }
 
 function drawBlock(x, y, col, char) {
-    ctx.fillStyle = col;
-    ctx.fillRect(x*BLOCK+1, y*BLOCK+1, BLOCK-2, BLOCK-2);
-    
-    // ハイライトライン（明るさアップ）
-    ctx.strokeStyle = 'rgba(255,255,255,0.7)';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(x*BLOCK+4, y*BLOCK+4, BLOCK-8, BLOCK-8);
-
-    // 文字（視認性アップ）
-    ctx.font = 'bold 18px sans-serif';
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.strokeStyle = '#000'; ctx.lineWidth = 4;
-    ctx.strokeText(char, x*BLOCK+BLOCK/2, y*BLOCK+BLOCK/2);
-    ctx.fillStyle = '#fff';
-    ctx.fillText(char, x*BLOCK+BLOCK/2, y*BLOCK+BLOCK/2);
+    ctx.fillStyle = col; ctx.fillRect(x*BLOCK+1, y*BLOCK+1, BLOCK-2, BLOCK-2);
+    ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = 2; ctx.strokeRect(x*BLOCK+4, y*BLOCK+4, BLOCK-8, BLOCK-8);
+    ctx.font = 'bold 20px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.strokeStyle = '#000'; ctx.lineWidth = 4; ctx.strokeText(char, x*BLOCK+BLOCK/2, y*BLOCK+BLOCK/2);
+    ctx.fillStyle = '#fff'; ctx.fillText(char, x*BLOCK+BLOCK/2, y*BLOCK+BLOCK/2);
 }
 
 function update(t = 0) {
@@ -206,7 +212,7 @@ function update(t = 0) {
     const dt = t - lastTime; lastTime = t;
     if (piece && !isSettling) {
         dropCounter += dt; levelTimer += dt;
-        if (levelTimer > 15000) { speed = Math.max(100, speed-40); levelTimer=0; currentLevel=Math.min(2, currentLevel+1); AE.playBGM(currentLevel); }
+        if (levelTimer > 15000) { speed = Math.max(100, speed-45); levelTimer=0; currentLevel = Math.min(2, currentLevel + 1); AE.playBGM(currentLevel); }
         if (dropCounter > speed) drop();
     }
     draw(); requestAnimationFrame(update);
