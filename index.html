@@ -200,11 +200,32 @@ function draw() {
 }
 
 function drawBlock(x, y, col, char) {
-    ctx.fillStyle = col; ctx.fillRect(x*BLOCK+1, y*BLOCK+1, BLOCK-2, BLOCK-2);
-    ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = 2; ctx.strokeRect(x*BLOCK+4, y*BLOCK+4, BLOCK-8, BLOCK-8);
-    ctx.font = 'bold 20px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.strokeStyle = '#000'; ctx.lineWidth = 4; ctx.strokeText(char, x*BLOCK+BLOCK/2, y*BLOCK+BLOCK/2);
-    ctx.fillStyle = '#fff'; ctx.fillText(char, x*BLOCK+BLOCK/2, y*BLOCK+BLOCK/2);
+    const px = x * BLOCK;
+    const py = y * BLOCK;
+
+    // 軽量ファミコン風描画
+    ctx.fillStyle = col;
+    ctx.fillRect(px, py, BLOCK, BLOCK);
+
+    // 上と左のハイライトライン
+    ctx.fillStyle = "rgba(255,255,255,0.4)";
+    ctx.fillRect(px, py, BLOCK, 2);
+    ctx.fillRect(px, py, 2, BLOCK);
+
+    // 下と右のシャドウライン
+    ctx.fillStyle = "rgba(0,0,0,0.3)";
+    ctx.fillRect(px + BLOCK - 2, py, 2, BLOCK);
+    ctx.fillRect(px, py + BLOCK - 2, BLOCK, 2);
+
+    // 文字
+    ctx.font = 'bold 20px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 3;
+    ctx.strokeText(char, px + BLOCK / 2, py + BLOCK / 2);
+    ctx.fillStyle = '#fff';
+    ctx.fillText(char, px + BLOCK / 2, py + BLOCK / 2);
 }
 
 function update(t = 0) {
