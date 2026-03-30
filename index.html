@@ -2,13 +2,19 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>Dr.モツオリス - Sound Edition</title>
+    <title>Dr.モツリス</title>
     <style>
         :root {
-            --bg-color: #1a1a1a;
+            --bg-color: #121212;
             --gold: #ffcc00;
-            --pastel-i: #a2d2ff; --pastel-o: #fdfd96; --pastel-s: #b1ffb1;
-            --pastel-z: #ffb1b1; --pastel-j: #c1c1ff; --pastel-l: #ffcc99; --pastel-t: #e1e1e1;
+            /* ミノの色をより明るいネオンパステルに変更 */
+            --pastel-i: #00dfff; /* 鮮やかな水色 */
+            --pastel-o: #ffff00; /* 明るい黄色 */
+            --pastel-s: #00ff00; /* 明るい緑 */
+            --pastel-z: #ff4f4f; /* 鮮やかな赤 */
+            --pastel-j: #7f7fff; /* 明るい青 */
+            --pastel-l: #ff9f00; /* 明るいオレンジ */
+            --pastel-t: #e0e0e0; /* 明るいグレー */
         }
         body {
             background-color: var(--bg-color);
@@ -21,8 +27,9 @@
             overflow: hidden;
             touch-action: none;
         }
-        h1 { margin: 10px 0; font-size: 26px; }
-        #game-container { position: relative; border: 4px solid #444; background: #000; }
+        #game-wrapper { position: relative; }
+        h1 { margin: 10px 0; font-size: 28px; text-align: center; color: #eee; }
+        #game-container { position: relative; border: 4px solid #555; background: #000; display: none; } /* 初期は非表示 */
         #score-box {
             position: absolute;
             top: 10px; left: 10px;
@@ -56,8 +63,8 @@
             100% { opacity: 0; transform: translateY(-80px); }
         }
         canvas { display: block; }
-        .controls { margin-top: 15px; display: flex; gap: 12px; }
-        button {
+        #controls-row { margin-top: 15px; display: none; gap: 12px; } /* 初期は非表示 */
+        button.ctrl-btn {
             padding: 12px 24px;
             font-size: 20px;
             font-weight: bold;
@@ -74,34 +81,73 @@
             background: rgba(0,0,0,0.9);
             flex-direction: column; justify-content: center; align-items: center; z-index: 200;
         }
+
+        /* タイトル画面のスタイル */
+        #title-screen {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            width: 300px; /* ゲーム画面と同じ幅 */
+            height: 600px; /* ゲーム画面と同じ高さ */
+            background: #000;
+            border: 4px solid #555;
+            position: relative;
+        }
+        #title-logo {
+            font-size: 40px;
+            font-weight: bold;
+            color: var(--gold);
+            text-shadow: 0 0 10px var(--gold), 2px 2px 0 #333;
+            margin-bottom: 50px;
+            text-align: center;
+        }
+        #start-btn {
+            padding: 15px 40px;
+            font-size: 24px;
+            background: #c0392b;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            box-shadow: 0 5px 0 #8e2c22;
+        }
+        #start-btn:active { transform: translateY(3px); box-shadow: 0 2px 0 #8e2c22; }
     </style>
 </head>
 <body>
 
-    <h1>Dr.モツオリス</h1>
-
-    <div id="game-container">
-        <div id="score-box">スコア: <span id="score-val">0</span></div>
-        <div id="word-overlay"></div>
-        <canvas id="canvas"></canvas>
+    <div id="game-wrapper">
         
-        <div id="modal">
-            <h2>GAME OVER</h2>
-            <button onclick="location.reload()">もう一度</button>
-            <button onclick="alert('また遊んでね！');location.reload();" style="margin-top:15px; background:#c0392b;">終了</button>
+        <div id="title-screen">
+            <div id="title-logo">Dr.モツリス</div>
+            <button id="start-btn" onclick="startGame()">START</button>
+        </div>
+
+        <h1>Dr.モツリス</h1>
+        <div id="game-container">
+            <div id="score-box">スコア: <span id="score-val">0</span></div>
+            <div id="word-overlay"></div>
+            <canvas id="canvas"></canvas>
+            
+            <div id="modal">
+                <h2>GAME OVER</h2>
+                <button class="ctrl-btn" onclick="location.reload()">もう一度</button>
+                <button class="ctrl-btn" onclick="alert('また遊んでね！');location.reload();" style="margin-top:15px; background:#c0392b;">終了</button>
+            </div>
         </div>
     </div>
 
-    <div class="controls">
-        <button onclick="handleInput('ArrowLeft')">←</button>
-        <button onclick="handleInput('ArrowUp')" style="background:#8e44ad;">回転</button>
-        <button onclick="handleInput('ArrowRight')">→</button>
-        <button onclick="handleInput('ArrowDown')">↓</button>
+    <div id="controls-row" class="controls">
+        <button class="ctrl-btn" onclick="handleInput('ArrowLeft')">←</button>
+        <button class="ctrl-btn" onclick="handleInput('ArrowUp')" style="background:#8e44ad;">回転</button>
+        <button class="ctrl-btn" onclick="handleInput('ArrowRight')">→</button>
+        <button class="ctrl-btn" onclick="handleInput('ArrowDown')">↓</button>
     </div>
 
 <script>
 /**
- * オーディオエンジン (Web Audio API)
+ * オーディオエンジン
  */
 const AudioEngine = {
     ctx: null,
@@ -110,68 +156,40 @@ const AudioEngine = {
         if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
     },
     playSE(type) {
-        this.init();
+        if (!this.ctx) return;
         const osc = this.ctx.createOscillator();
         const gain = this.ctx.createGain();
-        osc.connect(gain);
-        gain.connect(this.ctx.destination);
-
+        osc.connect(gain); gain.connect(this.ctx.destination);
         const now = this.ctx.currentTime;
         if (type === 'lock') { // ゴト
-            osc.type = 'triangle';
-            osc.frequency.setValueAtTime(120, now);
-            osc.frequency.exponentialRampToValueAtTime(40, now + 0.1);
-            gain.gain.setValueAtTime(0.3, now);
-            gain.gain.linearRampToValueAtTime(0, now + 0.2);
+            osc.type = 'triangle'; osc.frequency.setValueAtTime(120, now); osc.frequency.exponentialRampToValueAtTime(40, now + 0.1);
+            gain.gain.setValueAtTime(0.3, now); gain.gain.linearRampToValueAtTime(0, now + 0.2);
             osc.start(); osc.stop(now + 0.2);
-        } else if (type === 'clear') { // ライン消去
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(880, now);
-            gain.gain.setValueAtTime(0.2, now);
-            gain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
+        } else if (type === 'clear') { // 消える
+            osc.type = 'sine'; osc.frequency.setValueAtTime(880, now); gain.gain.setValueAtTime(0.2, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.5);
             osc.start(); osc.stop(now + 0.5);
         } else if (type === 'word') { // 文字成立
-            osc.type = 'square';
-            osc.frequency.setValueAtTime(440, now);
-            osc.frequency.exponentialRampToValueAtTime(1760, now + 0.3);
-            gain.gain.setValueAtTime(0.1, now);
-            gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+            osc.type = 'square'; osc.frequency.setValueAtTime(440, now); osc.frequency.exponentialRampToValueAtTime(1760, now + 0.3);
+            gain.gain.setValueAtTime(0.1, now); gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
             osc.start(); osc.stop(now + 0.3);
         }
     },
     playBGM(level) {
-        this.init();
+        if (!this.ctx) return;
         if (this.bgmNode) this.bgmNode.stop();
-        
         const tempo = [0.5, 0.4, 0.3][level] || 0.3;
         const notes = [[261, 329, 392], [329, 392, 493], [392, 493, 587]][level] || [392, 493, 587];
-
-        const bufferSize = this.ctx.sampleRate * 2;
-        const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-        const data = buffer.getChannelData(0);
-
-        this.bgmNode = this.ctx.createBufferSource();
-        this.bgmNode.buffer = buffer;
-        this.bgmNode.loop = true;
-
-        // 簡易的なメロディ生成
-        const gain = this.ctx.createGain();
-        gain.gain.value = 0.05;
-        this.bgmNode.connect(gain);
-        gain.connect(this.ctx.destination);
-        
-        // メロディのスケジューリング（実際にはもっと複雑なコードが必要ですが、ここでは起動トリガーとして機能）
+        this.bgmNode = this.ctx.createBufferSource(); // ダミー
         const interval = setInterval(() => {
-            if (over || paused) { clearInterval(interval); return; }
+            if (over || paused || !piece) { clearInterval(interval); return; }
             this.playTick(notes[Math.floor(Math.random() * notes.length)], 0.1);
         }, tempo * 1000);
     },
     playTick(freq, dur) {
-        const osc = this.ctx.createOscillator();
-        const g = this.ctx.createGain();
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator(); const g = this.ctx.createGain();
         osc.connect(g); g.connect(this.ctx.destination);
-        osc.frequency.value = freq;
-        g.gain.setValueAtTime(0.02, this.ctx.currentTime);
+        osc.frequency.value = freq; g.gain.setValueAtTime(0.02, this.ctx.currentTime);
         g.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + dur);
         osc.start(); osc.stop(this.ctx.currentTime + dur);
     }
@@ -187,6 +205,7 @@ const SHAPES = {
     I:[[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], O:[[1,1],[1,1]], S:[[0,1,1],[1,1,0],[0,0,0]], Z:[[1,1,0],[0,1,1],[0,0,0]],
     J:[[1,0,0],[1,1,1],[0,0,0]], L:[[0,0,1],[1,1,1],[0,0,0]], T:[[0,1,0],[1,1,1],[0,0,0]]
 };
+// ミノの色を明るいネオンパステルに
 const COLORS = {I:'var(--pastel-i)', O:'var(--pastel-o)', S:'var(--pastel-s)', Z:'var(--pastel-z)', J:'var(--pastel-j)', L:'var(--pastel-l)', T:'var(--pastel-t)'};
 
 const cvs = document.getElementById('canvas');
@@ -194,7 +213,7 @@ const ctx = cvs.getContext('2d');
 cvs.width = COLS * BLOCK; cvs.height = ROWS * BLOCK;
 
 let grid = Array.from({length: ROWS}, () => Array(COLS).fill(null));
-let score = 0, over = false, paused = false, lastTime = 0, dropCounter = 0, speed = 500, levelTimer = 0, piece = null, isSettling = false, currentLevel = 0;
+let score = 0, over = false, paused = false, lastTime = 0, dropCounter = 0, speed = 500, levelTimer = 0, piece = null, isSettling = false, currentLevel = 0, isStarted = false;
 
 class Piece {
     constructor() {
@@ -216,6 +235,18 @@ class Piece {
     }
 }
 
+function startGame() {
+    isStarted = true;
+    AudioEngine.init(); // オーディオアンロック
+    document.getElementById('title-screen').style.display = 'none'; // タイトル非表示
+    document.getElementById('game-container').style.display = 'block'; // ゲーム表示
+    document.getElementById('controls-row').style.display = 'flex'; // ボタン表示
+    
+    AudioEngine.playBGM(0); // BGM開始
+    spawn();
+    requestAnimationFrame(update);
+}
+
 function collide(px, py, pd) {
     return pd.some((row, dy) => row.some((char, dx) => {
         if (!char) return false;
@@ -225,7 +256,7 @@ function collide(px, py, pd) {
 }
 
 function lock() {
-    AudioEngine.playSE('lock'); // 接地音「ゴト」
+    AudioEngine.playSE('lock');
     piece.data.forEach((row, dy) => row.forEach((char, dx) => {
         if (char) {
             let finalY = piece.y + dy;
@@ -256,13 +287,13 @@ function checkLines() {
     for (let y = 0; y < ROWS; y++) {
         if (grid[y].every(cell => cell !== null)) {
             linesFound = true;
-            AudioEngine.playSE('clear'); // 消える音
+            AudioEngine.playSE('clear');
             const lineStr = grid[y].map(c => c.char).join("");
             WORDS.forEach(w => {
                 let startIdx = 0;
                 while((startIdx = lineStr.indexOf(w, startIdx)) !== -1) {
                     score += (w.length * 100);
-                    AudioEngine.playSE('word'); // 文字成立音
+                    AudioEngine.playSE('word');
                     showGoldWord(w);
                     startIdx += w.length;
                 }
@@ -291,8 +322,7 @@ function spawn() {
 }
 
 function handleInput(key) {
-    AudioEngine.init(); // ユーザー操作でオーディオをアンロック
-    if (over || !piece || isSettling) return;
+    if (!isStarted || over || !piece || isSettling) return;
     if (key === 'ArrowLeft' && !collide(piece.x - 1, piece.y, piece.data)) piece.x--;
     if (key === 'ArrowRight' && !collide(piece.x + 1, piece.y, piece.data)) piece.x++;
     if (key === 'ArrowDown') drop();
@@ -327,7 +357,7 @@ function drawBlock(x, y, color, char) {
 }
 
 function update(time = 0) {
-    if (!over) {
+    if (!over && isStarted) {
         const dt = time - lastTime;
         lastTime = time;
         if (piece && !isSettling) {
@@ -336,7 +366,7 @@ function update(time = 0) {
                 speed = Math.max(100, speed - 40); 
                 levelTimer = 0; 
                 currentLevel = Math.min(2, currentLevel + 1);
-                AudioEngine.playBGM(currentLevel); // スピードアップでBGM変更
+                AudioEngine.playBGM(currentLevel);
             }
             if (dropCounter > speed) drop();
         }
@@ -351,10 +381,6 @@ window.addEventListener('keydown', e => {
     }
 });
 
-// 初回BGM起動
-setTimeout(() => AudioEngine.playBGM(0), 1000);
-spawn();
-requestAnimationFrame(update);
 </script>
 </body>
 </html>
