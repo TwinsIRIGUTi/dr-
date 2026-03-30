@@ -6,7 +6,6 @@
     <title>Dr.モツリス</title>
     <style>
         :root { --bg-color: #0a0a0a; --gold: #fff000; }
-        /* 画面の拡大・スクロールを完全に禁止 */
         html, body { 
             position: fixed;
             overflow: hidden;
@@ -86,17 +85,22 @@
     </div>
 
 <script>
-// --- スマホズーム対策 ---
-document.addEventListener('touchstart', (e) => {
-    if (e.touches.length > 1) e.preventDefault(); // ピンチズーム禁止
-}, { passive: false });
-
+// --- スマホズーム・オートポーズ対策 ---
+document.addEventListener('touchstart', (e) => { if (e.touches.length > 1) e.preventDefault(); }, { passive: false });
 let lastTouchEnd = 0;
 document.addEventListener('touchend', (e) => {
     const now = (new Date()).getTime();
-    if (now - lastTouchEnd <= 300) e.preventDefault(); // ダブルタップズーム禁止
+    if (now - lastTouchEnd <= 300) e.preventDefault();
     lastTouchEnd = now;
 }, false);
+
+// 画面切り替え時に一時停止
+document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden" && !over && !paused) {
+        paused = true;
+        document.getElementById('pause-overlay').style.display = 'flex';
+    }
+});
 
 // --- ゲーム定数 ---
 const COLS = 10, ROWS = 18, BLOCK = 32;
@@ -202,31 +206,37 @@ function processSettling() {
 
 function checkMatches() {
     let toDelete = Array.from({length: ROWS}, () => Array(COLS).fill(false));
-    let foundAny = false, matchWords = [];
+    let foundAny = false, matchWords = [], linesThisTurn = 0;
+    
     for (let y = 0; y < ROWS; y++) {
         let rowChars = grid[y].map(c => c ? c.char : null);
         WORDS.forEach(word => { if (isWordInList(word, rowChars)) { foundAny = true; matchWords.push(word); markForDeletion(word, grid[y], toDelete[y]); } });
-        if (grid[y].every(c => c !== null)) { score += 1000; grid[y].forEach((_, x) => toDelete[y][x] = true); foundAny = true; }
+        if (grid[y].every(c => c !== null)) { 
+            score += 1000; grid[y].forEach((_, x) => toDelete[y][x] = true); 
+            foundAny = true; linesThisTurn++; 
+        }
     }
+    // テトリスボーナス
+    if (linesThisTurn >= 4) { score += 10000; showGold("TETRIS BONUS!"); }
+
     for (let x = 0; x < COLS; x++) {
         let colChars = []; for (let y = 0; y < ROWS; y++) colChars.push(grid[y][x] ? grid[y][x].char : null);
         WORDS.forEach(word => { if (isWordInList(word, colChars)) { foundAny = true; matchWords.push(word); markForDeletionVertical(word, x, toDelete); } });
     }
+
     if (foundAny) {
         AE.playSE('clear'); comboCount++; totalWordsCount += matchWords.length;
         matchWords.forEach(w => { score += (w.length * 150) * comboCount; showGold(`${w}${comboCount > 1 ? ' x'+comboCount : ''}`); });
         for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) if (toDelete[y][x]) grid[y][x] = null;
-        linesCleared += comboCount;
-        const newLvl = Math.floor(linesCleared / 10);
+        linesCleared += linesThisTurn;
+        
+        // レベルアップ判定: 10ラインごと、または5000点獲得ごと
+        const newLvl = Math.max(Math.floor(linesCleared / 10), Math.floor(score / 5000));
         if (newLvl > currentLevel) {
             currentLevel = newLvl;
-            if (currentLevel < 35) {
-                speed = Math.max(30, 800 - (currentLevel * 22));
-            } else if (currentLevel < 50) {
-                speed = Math.max(1, 30 - (currentLevel - 35) * 2);
-            } else {
-                speed = 1;
-            }
+            if (currentLevel < 35) { speed = Math.max(30, 800 - (currentLevel * 22)); }
+            else if (currentLevel < 50) { speed = Math.max(1, 30 - (currentLevel - 35) * 2); }
+            else { speed = 1; }
             AE.playSE('levelup'); AE.playBGM();
         }
         scoreSpan.innerText = score; lvlSpan.innerText = currentLevel; setTimeout(processSettling, 150);
