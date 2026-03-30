@@ -17,8 +17,14 @@
         #controls-row { width: 100%; display: none; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 15px; box-sizing: border-box; }
         .ctrl-btn { height: 70px; font-size: 26px; font-weight: bold; cursor: pointer; border-radius: 12px; border: none; background: #444; color: white; box-shadow: 0 5px 0 #222; }
         .ctrl-btn:active { transform: translateY(3px); box-shadow: 0 2px 0 #222; }
-        #title-screen { display: flex; flex-direction: column; justify-content: center; align-items: center; width: 300px; height: 480px; background: #1a1a1a; border: 3px solid #555; border-radius: 15px; margin-top: 10px; }
-        #title-logo { font-size: 38px; font-weight: bold; color: var(--gold); text-shadow: 0 0 15px var(--gold); margin-bottom: 40px; }
+        
+        /* タイトル画面拡張 */
+        #title-screen { position: relative; display: flex; flex-direction: column; justify-content: center; align-items: center; width: 300px; height: 480px; background: #1a1a1a; border: 3px solid #555; border-radius: 15px; margin-top: 10px; }
+        #title-logo { font-size: 38px; font-weight: bold; color: var(--gold); text-shadow: 0 0 15px var(--gold); margin-bottom: 20px; }
+        #sound-toggle { position: absolute; top: 15px; right: 15px; background: #333; border: 1px solid #777; color: white; padding: 5px 10px; border-radius: 5px; font-size: 12px; cursor: pointer; }
+        #ranking-box { width: 80%; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 10px; margin-bottom: 30px; font-size: 14px; color: #ddd; border: 1px solid #444; }
+        .ranking-item { display: flex; justify-content: space-between; margin: 5px 0; border-bottom: 1px solid #333; }
+        
         #start-btn { padding: 18px 45px; font-size: 24px; background: #c0392b; color: white; border: none; border-radius: 40px; box-shadow: 0 5px 0 #7e261d; }
         #modal { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); flex-direction: column; justify-content: center; align-items: center; z-index: 200; }
     </style>
@@ -26,7 +32,12 @@
 <body>
     <div id="game-wrapper">
         <div id="title-screen">
+            <button id="sound-toggle" onclick="toggleSound()">SOUND: ON</button>
             <div id="title-logo">Dr.モツリス</div>
+            <div id="ranking-box">
+                <div style="text-align:center; color:var(--gold); margin-bottom:5px;">🏆 TOP RECORDS</div>
+                <div id="ranking-list"></div>
+            </div>
             <button id="start-btn" onclick="startGame()">START</button>
         </div>
         <div id="game-container">
@@ -58,11 +69,13 @@ cvs.width = COLS * BLOCK; cvs.height = ROWS * BLOCK;
 
 let grid = Array.from({length: ROWS}, () => Array(COLS).fill(null));
 let score = 0, over = false, lastTime = 0, dropCounter = 0, speed = 500, levelTimer = 0, piece = null, isSettling = false, currentLevel = 0, bgmInterval = null;
+let soundEnabled = localStorage.getItem('motu_sound') !== 'OFF';
 
 const AE = {
     ctx: null,
     init() { if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); if (this.ctx.state === 'suspended') this.ctx.resume(); },
     osc(f, gVal, dur, type='sine') {
+        if (!soundEnabled) return { stop: () => {}, frequency: { exponentialRampToValueAtTime: () => {} } };
         const o = this.ctx.createOscillator(), g = this.ctx.createGain();
         o.type = type; o.connect(g); g.connect(this.ctx.destination);
         o.frequency.setValueAtTime(f, this.ctx.currentTime);
@@ -71,7 +84,7 @@ const AE = {
         o.start(); o.stop(this.ctx.currentTime + dur); return o;
     },
     playSE(t) {
-        if (!this.ctx) return;
+        if (!this.ctx || !soundEnabled) return;
         if (t==='lock') this.osc(120, 0.2, 0.1, 'triangle');
         else if (t==='clear') this.osc(800, 0.15, 0.4);
         else if (t==='word') this.osc(440, 0.1, 0.3, 'square').frequency.exponentialRampToValueAtTime(1320, this.ctx.currentTime + 0.3);
@@ -79,10 +92,28 @@ const AE = {
     },
     playBGM(l) {
         if (bgmInterval) clearInterval(bgmInterval);
+        if (!soundEnabled) return;
         const t = [0.5, 0.4, 0.35][l], n = [[261, 329, 392], [329, 392, 493], [392, 493, 587]][l];
-        bgmInterval = setInterval(() => { if (!over && piece && !isSettling) this.osc(n[Math.floor(Math.random()*n.length)], 0.015, 0.12, 'square'); }, t * 1000);
+        bgmInterval = setInterval(() => { if (!over && piece && !isSettling && soundEnabled) this.osc(n[Math.floor(Math.random()*n.length)], 0.015, 0.12, 'square'); }, t * 1000);
     }
 };
+
+function toggleSound() {
+    soundEnabled = !soundEnabled;
+    localStorage.setItem('motu_sound', soundEnabled ? 'ON' : 'OFF');
+    document.getElementById('sound-toggle').innerText = `SOUND: ${soundEnabled ? 'ON' : 'OFF'}`;
+}
+
+function updateRankingDisplay() {
+    const ranks = JSON.parse(localStorage.getItem('motu_ranks') || "[0,0,0]");
+    document.getElementById('ranking-list').innerHTML = ranks.map((s, i) => `<div class="ranking-item"><span>${i+1}位</span><span>${s} pts</span></div>`).join("");
+}
+
+function saveScore(s) {
+    let ranks = JSON.parse(localStorage.getItem('motu_ranks') || "[0,0,0]");
+    ranks.push(s); ranks.sort((a,b) => b-a);
+    localStorage.setItem('motu_ranks', JSON.stringify(ranks.slice(0,3)));
+}
 
 function getRandomChar() { return Math.random() < 0.7 ? HIGH_FREQ[Math.floor(Math.random()*HIGH_FREQ.length)] : NORMAL_FREQ[Math.floor(Math.random()*NORMAL_FREQ.length)]; }
 
@@ -101,7 +132,7 @@ class Piece {
 function startGame() { AE.init(); document.getElementById('title-screen').style.display = 'none'; document.getElementById('game-container').style.display = 'block'; document.getElementById('controls-row').style.display = 'grid'; AE.playBGM(0); spawn(); requestAnimationFrame(update); }
 function collide(px, py, pd) { return pd.some((row, dy) => row.some((char, dx) => char && (px+dx<0 || px+dx>=COLS || py+dy>=ROWS || (py+dy>=0 && grid[py+dy][px+dx])))); }
 function lock() { AE.playSE('lock'); piece.data.forEach((row, dy) => row.forEach((char, dx) => { if (char) { if (piece.y+dy<0) triggerGameOver(); else grid[piece.y+dy][piece.x+dx] = {char, color: piece.color}; } })); piece = null; if (!over) { isSettling = true; splitAndSettle(); } }
-function triggerGameOver() { if (over) return; over = true; AE.playSE('die'); document.getElementById('modal').style.display = 'flex'; }
+function triggerGameOver() { if (over) return; over = true; AE.playSE('die'); saveScore(score); document.getElementById('modal').style.display = 'flex'; }
 function splitAndSettle() { let m = false; for (let y = ROWS-2; y >= 0; y--) for (let x = 0; x < COLS; x++) if (grid[y][x] && !grid[y+1][x]) { grid[y+1][x]=grid[y][x]; grid[y][x]=null; m=true; } if (m) setTimeout(splitAndSettle, 40); else checkLines(); }
 
 function checkLines() {
@@ -112,10 +143,7 @@ function checkLines() {
             const rowChars = grid[y].map(c => c.char);
             WORDS.forEach(word => {
                 let tempChars = [...rowChars]; let match = true;
-                for (let char of word) {
-                    const idx = tempChars.indexOf(char);
-                    if (idx !== -1) tempChars.splice(idx, 1); else { match = false; break; }
-                }
+                for (let char of word) { const idx = tempChars.indexOf(char); if (idx !== -1) tempChars.splice(idx, 1); else { match = false; break; } }
                 if (match) { score += word.length * 150; AE.playSE('word'); showGold(word); }
             });
             grid.splice(y, 1); grid.unshift(Array(COLS).fill(null)); score += 1000;
@@ -154,6 +182,10 @@ function update(t = 0) {
     }
     draw(); requestAnimationFrame(update);
 }
+
+// 初期化
+updateRankingDisplay();
+document.getElementById('sound-toggle').innerText = `SOUND: ${soundEnabled ? 'ON' : 'OFF'}`;
 </script>
 </body>
 </html>
