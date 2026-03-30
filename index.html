@@ -9,22 +9,19 @@
         body { background: var(--bg-color); color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; margin: 0; padding: 0; overflow: hidden; touch-action: none; height: 100vh; }
         #game-wrapper { width: 320px; display: flex; flex-direction: column; align-items: center; margin-top: 10px; }
         #game-container { position: relative; border: 3px solid #888; background: #000; display: none; }
-        #score-box { position: absolute; top: 5px; left: 5px; z-index: 10; font-size: 16px; font-weight: bold; background: rgba(0,0,0,0.8); padding: 3px 8px; border: 1px solid #666; }
+        #score-box { position: absolute; top: 5px; left: 5px; z-index: 10; font-size: 16px; font-weight: bold; background: rgba(0,0,0,0.8); padding: 3px 8px; border: 1px solid #666; line-height: 1.2; }
         #word-overlay { position: absolute; top: 35%; left: 50%; transform: translate(-50%, -50%); z-index: 100; text-align: center; pointer-events: none; width: 100%; }
         .gold-msg { color: var(--gold); font-size: 40px; font-weight: bold; text-shadow: 0 0 15px #fff, 2px 2px 2px #000; animation: fOU 2s forwards; display: block; }
         @keyframes fOU { 0% { opacity: 0; transform: scale(0.5); } 10% { opacity: 1; transform: scale(1.1); } 90% { opacity: 1; transform: scale(1.1); } 100% { opacity: 0; transform: translateY(-40px); } }
         canvas { display: block; background: #000; }
         #controls-row { width: 100%; display: none; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 15px; box-sizing: border-box; }
-        .ctrl-btn { height: 70px; font-size: 26px; font-weight: bold; cursor: pointer; border-radius: 12px; border: none; background: #444; color: white; box-shadow: 0 5px 0 #222; }
+        .ctrl-btn { height: 70px; font-size: 26px; font-weight: bold; cursor: pointer; border-radius: 12px; border: none; background: #444; color: white; box-shadow: 0 5px 0 #222; -webkit-user-select: none; }
         .ctrl-btn:active { transform: translateY(3px); box-shadow: 0 2px 0 #222; }
-        
-        /* タイトル画面拡張 */
         #title-screen { position: relative; display: flex; flex-direction: column; justify-content: center; align-items: center; width: 300px; height: 480px; background: #1a1a1a; border: 3px solid #555; border-radius: 15px; margin-top: 10px; }
         #title-logo { font-size: 38px; font-weight: bold; color: var(--gold); text-shadow: 0 0 15px var(--gold); margin-bottom: 20px; }
         #sound-toggle { position: absolute; top: 15px; right: 15px; background: #333; border: 1px solid #777; color: white; padding: 5px 10px; border-radius: 5px; font-size: 12px; cursor: pointer; }
         #ranking-box { width: 80%; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 10px; margin-bottom: 30px; font-size: 14px; color: #ddd; border: 1px solid #444; }
         .ranking-item { display: flex; justify-content: space-between; margin: 5px 0; border-bottom: 1px solid #333; }
-        
         #start-btn { padding: 18px 45px; font-size: 24px; background: #c0392b; color: white; border: none; border-radius: 40px; box-shadow: 0 5px 0 #7e261d; }
         #modal { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); flex-direction: column; justify-content: center; align-items: center; z-index: 200; }
     </style>
@@ -41,7 +38,10 @@
             <button id="start-btn" onclick="startGame()">START</button>
         </div>
         <div id="game-container">
-            <div id="score-box">SCORE: <span id="score-val">0</span></div>
+            <div id="score-box">
+                SCORE: <span id="score-val">0</span><br>
+                LEVEL: <span id="lvl-val">0</span>
+            </div>
             <div id="word-overlay"></div>
             <canvas id="canvas"></canvas>
             <div id="modal">
@@ -51,9 +51,9 @@
         </div>
     </div>
     <div id="controls-row">
-        <button class="ctrl-btn" ontouchstart="handleInput('ArrowLeft')">←</button>
-        <button class="ctrl-btn" ontouchstart="handleInput('ArrowUp')" style="background:#6c3483;">回転</button>
-        <button class="ctrl-btn" ontouchstart="handleInput('ArrowRight')">→</button>
+        <button class="ctrl-btn" ontouchstart="startInput('ArrowLeft')" ontouchend="stopInput()" onmousedown="startInput('ArrowLeft')" onmouseup="stopInput()">←</button>
+        <button class="ctrl-btn" ontouchstart="handleInput('ArrowUp')" onmousedown="handleInput('ArrowUp')" style="background:#6c3483;">回転</button>
+        <button class="ctrl-btn" ontouchstart="startInput('ArrowRight')" ontouchend="stopInput()" onmousedown="startInput('ArrowRight')" onmouseup="stopInput()">→</button>
     </div>
 
 <script>
@@ -64,11 +64,14 @@ const WORDS = ["シロ","レバ","ガツ","コブクロ","ナンコツ","アブ�
 const SHAPES = { I:[[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], O:[[1,1],[1,1]], S:[[0,1,1],[1,1,0],[0,0,0]], Z:[[1,1,0],[0,1,1],[0,0,0]], J:[[1,0,0],[1,1,1],[0,0,0]], L:[[0,0,1],[1,1,1],[0,0,0]], T:[[0,1,0],[1,1,1],[0,0,0]] };
 const COLORS = { I:'#00f0f0', O:'#f0f000', S:'#00f000', Z:'#f00000', J:'#0000f0', L:'#f0a000', T:'#a000f0' };
 
-const cvs = document.getElementById('canvas'), ctx = cvs.getContext('2d'), scoreSpan = document.getElementById('score-val'), wordDiv = document.getElementById('word-overlay');
+const cvs = document.getElementById('canvas'), ctx = cvs.getContext('2d'), scoreSpan = document.getElementById('score-val'), lvlSpan = document.getElementById('lvl-val'), wordDiv = document.getElementById('word-overlay');
 cvs.width = COLS * BLOCK; cvs.height = ROWS * BLOCK;
 
 let grid = Array.from({length: ROWS}, () => Array(COLS).fill(null));
-let score = 0, over = false, lastTime = 0, dropCounter = 0, speed = 500, levelTimer = 0, piece = null, isSettling = false, currentLevel = 0, bgmInterval = null;
+let score = 0, linesCleared = 0, over = false, lastTime = 0, dropCounter = 0, speed = 800, piece = null, isSettling = false, currentLevel = 0, bgmInterval = null;
+let lockTimer = 0, lockDelay = 500;
+let inputTimer = 0, inputDir = null, inputRepeatDelay = 180, inputRepeatRate = 50;
+
 let soundEnabled = localStorage.getItem('motu_sound') !== 'OFF';
 
 const AE = {
@@ -89,32 +92,24 @@ const AE = {
         else if (t==='clear') this.osc(800, 0.15, 0.4);
         else if (t==='word') this.osc(440, 0.1, 0.3, 'square').frequency.exponentialRampToValueAtTime(1320, this.ctx.currentTime + 0.3);
         else if (t==='die') { const o = this.osc(330, 0.2, 0.8, 'square'); o.frequency.exponentialRampToValueAtTime(110, this.ctx.currentTime + 0.8); }
+        else if (t==='levelup') {
+            [523.25, 659.25, 783.99].forEach((f, i) => {
+                setTimeout(() => this.osc(f, 0.1, 0.2, 'sine'), i * 100);
+            });
+        }
     },
     playBGM(l) {
         if (bgmInterval) clearInterval(bgmInterval);
         if (!soundEnabled) return;
-        const t = [0.5, 0.4, 0.35][l], n = [[261, 329, 392], [329, 392, 493], [392, 493, 587]][l];
+        const speedIdx = Math.min(2, Math.floor(l / 5));
+        const t = [0.5, 0.4, 0.35][speedIdx], n = [[261, 329, 392], [329, 392, 493], [392, 493, 587]][speedIdx];
         bgmInterval = setInterval(() => { if (!over && piece && !isSettling && soundEnabled) this.osc(n[Math.floor(Math.random()*n.length)], 0.015, 0.12, 'square'); }, t * 1000);
     }
 };
 
-function toggleSound() {
-    soundEnabled = !soundEnabled;
-    localStorage.setItem('motu_sound', soundEnabled ? 'ON' : 'OFF');
-    document.getElementById('sound-toggle').innerText = `SOUND: ${soundEnabled ? 'ON' : 'OFF'}`;
-}
-
-function updateRankingDisplay() {
-    const ranks = JSON.parse(localStorage.getItem('motu_ranks') || "[0,0,0]");
-    document.getElementById('ranking-list').innerHTML = ranks.map((s, i) => `<div class="ranking-item"><span>${i+1}位</span><span>${s} pts</span></div>`).join("");
-}
-
-function saveScore(s) {
-    let ranks = JSON.parse(localStorage.getItem('motu_ranks') || "[0,0,0]");
-    ranks.push(s); ranks.sort((a,b) => b-a);
-    localStorage.setItem('motu_ranks', JSON.stringify(ranks.slice(0,3)));
-}
-
+function toggleSound() { soundEnabled = !soundEnabled; localStorage.setItem('motu_sound', soundEnabled ? 'ON' : 'OFF'); document.getElementById('sound-toggle').innerText = `SOUND: ${soundEnabled ? 'ON' : 'OFF'}`; }
+function updateRankingDisplay() { const ranks = JSON.parse(localStorage.getItem('motu_ranks') || "[0,0,0]"); document.getElementById('ranking-list').innerHTML = ranks.map((s, i) => `<div class="ranking-item"><span>${i+1}位</span><span>${s} pts</span></div>`).join(""); }
+function saveScore(s) { let ranks = JSON.parse(localStorage.getItem('motu_ranks') || "[0,0,0]"); ranks.push(s); ranks.sort((a,b) => b-a); localStorage.setItem('motu_ranks', JSON.stringify(ranks.slice(0,3))); }
 function getRandomChar() { return Math.random() < 0.7 ? HIGH_FREQ[Math.floor(Math.random()*HIGH_FREQ.length)] : NORMAL_FREQ[Math.floor(Math.random()*NORMAL_FREQ.length)]; }
 
 class Piece {
@@ -125,7 +120,9 @@ class Piece {
     }
     rotate() {
         const n = this.data[0].map((_, i) => this.data.map(row => row[i]).reverse());
-        if (!collide(this.x, this.y, n)) this.data = n; else if (!collide(this.x-1, this.y, n)) { this.x--; this.data = n; } else if (!collide(this.x+1, this.y, n)) { this.x++; this.data = n; }
+        if (!collide(this.x, this.y, n)) { this.data = n; lockTimer = 0; }
+        else if (!collide(this.x-1, this.y, n)) { this.x--; this.data = n; lockTimer = 0; }
+        else if (!collide(this.x+1, this.y, n)) { this.x++; this.data = n; lockTimer = 0; }
     }
 }
 
@@ -136,10 +133,10 @@ function triggerGameOver() { if (over) return; over = true; AE.playSE('die'); sa
 function splitAndSettle() { let m = false; for (let y = ROWS-2; y >= 0; y--) for (let x = 0; x < COLS; x++) if (grid[y][x] && !grid[y+1][x]) { grid[y+1][x]=grid[y][x]; grid[y][x]=null; m=true; } if (m) setTimeout(splitAndSettle, 40); else checkLines(); }
 
 function checkLines() {
-    let f = false;
+    let f = false, count = 0;
     for (let y = 0; y < ROWS; y++) {
         if (grid[y].every(c => c !== null)) {
-            f = true; AE.playSE('clear');
+            f = true; count++; AE.playSE('clear');
             const rowChars = grid[y].map(c => c.char);
             WORDS.forEach(word => {
                 let tempChars = [...rowChars]; let match = true;
@@ -149,13 +146,37 @@ function checkLines() {
             grid.splice(y, 1); grid.unshift(Array(COLS).fill(null)); score += 1000;
         }
     }
-    scoreSpan.innerText = score; if (f) splitAndSettle(); else { isSettling = false; spawn(); }
+    if (count > 0) {
+        linesCleared += count;
+        const newLvl = Math.floor(linesCleared / 10);
+        if (newLvl > currentLevel) {
+            currentLevel = newLvl;
+            speed = Math.max(100, 800 - (currentLevel * 70));
+            AE.playSE('levelup'); // レベルアップSE再生
+            AE.playBGM(currentLevel);
+        }
+    }
+    scoreSpan.innerText = score; lvlSpan.innerText = currentLevel; if (f) splitAndSettle(); else { isSettling = false; spawn(); }
 }
 
 function showGold(w) { const d = document.createElement('span'); d.className='gold-msg'; d.innerText=w; wordDiv.appendChild(d); setTimeout(()=>d.remove(), 2000); }
 function spawn() { piece = new Piece(); if (collide(piece.x, piece.y, piece.data)) triggerGameOver(); }
-function handleInput(k) { if (over || !piece || isSettling) return; if (k==='ArrowLeft' && !collide(piece.x-1, piece.y, piece.data)) piece.x--; if (k==='ArrowRight' && !collide(piece.x+1, piece.y, piece.data)) piece.x++; if (k==='ArrowUp') piece.rotate(); draw(); }
-function drop() { if (!piece || isSettling) return; if (!collide(piece.x, piece.y+1, piece.data)) piece.y++; else lock(); dropCounter = 0; }
+function startInput(dir) { handleInput(dir); inputDir = dir; inputTimer = 0; }
+function stopInput() { inputDir = null; }
+function handleInput(k) { if (over || !piece || isSettling) return; if (k==='ArrowLeft' && !collide(piece.x-1, piece.y, piece.data)) { piece.x--; lockTimer = 0; } if (k==='ArrowRight' && !collide(piece.x+1, piece.y, piece.data)) { piece.x++; lockTimer = 0; } if (k==='ArrowUp') piece.rotate(); draw(); }
+
+function update(t = 0) {
+    if (over) return; const dt = t - lastTime; lastTime = t;
+    if (inputDir) { inputTimer += dt; if (inputTimer > inputRepeatDelay) { inputTimer -= inputRepeatRate; handleInput(inputDir); } }
+    if (piece && !isSettling) {
+        dropCounter += dt;
+        if (dropCounter > speed) {
+            if (!collide(piece.x, piece.y+1, piece.data)) { piece.y++; dropCounter = 0; lockTimer = 0; } 
+            else { lockTimer += dt; if (lockTimer > lockDelay) { lock(); lockTimer = 0; } }
+        } else if (collide(piece.x, piece.y+1, piece.data)) { lockTimer += dt; if (lockTimer > lockDelay) { lock(); lockTimer = 0; } }
+    }
+    draw(); requestAnimationFrame(update);
+}
 
 function draw() {
     ctx.fillStyle = '#000'; ctx.fillRect(0, 0, cvs.width, cvs.height);
@@ -173,17 +194,6 @@ function drawBlock(x, y, col, char) {
     ctx.fillStyle = '#fff'; ctx.fillText(char, px + BLOCK / 2, py + BLOCK / 2);
 }
 
-function update(t = 0) {
-    if (over) return; const dt = t - lastTime; lastTime = t;
-    if (piece && !isSettling) {
-        dropCounter += dt; levelTimer += dt;
-        if (levelTimer > 15000) { speed = Math.max(100, speed-45); levelTimer=0; currentLevel = Math.min(2, currentLevel + 1); AE.playBGM(currentLevel); }
-        if (dropCounter > speed) drop();
-    }
-    draw(); requestAnimationFrame(update);
-}
-
-// 初期化
 updateRankingDisplay();
 document.getElementById('sound-toggle').innerText = `SOUND: ${soundEnabled ? 'ON' : 'OFF'}`;
 </script>
