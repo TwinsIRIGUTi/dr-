@@ -5,47 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Dr.モツリス</title>
     <style>
-        :root {
-            --bg-color: #0a0a0a; --gold: #fff000;
-            --p-i: #00f0f0; --p-o: #f0f000; --p-s: #00f000; --p-z: #f00000; --p-j: #0000f0; --p-l: #f0a000; --p-t: #a000f0;
-        }
-        body {
-            background: var(--bg-color); color: white; font-family: sans-serif;
-            display: flex; flex-direction: column; align-items: center; margin: 0; padding: 0;
-            overflow: hidden; touch-action: none; height: 100vh;
-        }
+        :root { --bg-color: #0a0a0a; --gold: #fff000; }
+        body { background: var(--bg-color); color: white; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; margin: 0; padding: 0; overflow: hidden; touch-action: none; height: 100vh; }
         #game-wrapper { width: 320px; display: flex; flex-direction: column; align-items: center; margin-top: 10px; }
-        h1 { margin: 5px 0; font-size: 24px; color: var(--gold); }
-        
         #game-container { position: relative; border: 3px solid #888; background: #000; display: none; }
-        #score-box {
-            position: absolute; top: 5px; left: 5px; z-index: 10; font-size: 16px; font-weight: bold;
-            background: rgba(0,0,0,0.8); padding: 3px 8px; border: 1px solid #666;
-        }
-        #word-overlay {
-            position: absolute; top: 35%; left: 50%; transform: translate(-50%, -50%);
-            z-index: 100; text-align: center; pointer-events: none; width: 100%;
-        }
-        .gold-msg {
-            color: var(--gold); font-size: 40px; font-weight: bold;
-            text-shadow: 0 0 15px #fff, 2px 2px 2px #000; 
-            animation: fOU 2s forwards; display: block;
-        }
-        @keyframes fOU {
-            0% { opacity: 0; transform: scale(0.5); }
-            10% { opacity: 1; transform: scale(1.1); }
-            90% { opacity: 1; transform: scale(1.1); }
-            100% { opacity: 0; transform: translateY(-40px); }
-        }
+        #score-box { position: absolute; top: 5px; left: 5px; z-index: 10; font-size: 16px; font-weight: bold; background: rgba(0,0,0,0.8); padding: 3px 8px; border: 1px solid #666; }
+        #word-overlay { position: absolute; top: 35%; left: 50%; transform: translate(-50%, -50%); z-index: 100; text-align: center; pointer-events: none; width: 100%; }
+        .gold-msg { color: var(--gold); font-size: 40px; font-weight: bold; text-shadow: 0 0 15px #fff, 2px 2px 2px #000; animation: fOU 2s forwards; display: block; }
+        @keyframes fOU { 0% { opacity: 0; transform: scale(0.5); } 10% { opacity: 1; transform: scale(1.1); } 90% { opacity: 1; transform: scale(1.1); } 100% { opacity: 0; transform: translateY(-40px); } }
         canvas { display: block; background: #000; }
-        
         #controls-row { width: 100%; display: none; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 15px; box-sizing: border-box; }
-        .ctrl-btn {
-            height: 70px; font-size: 26px; font-weight: bold; cursor: pointer; border-radius: 12px;
-            border: none; background: #444; color: white; box-shadow: 0 5px 0 #222;
-        }
+        .ctrl-btn { height: 70px; font-size: 26px; font-weight: bold; cursor: pointer; border-radius: 12px; border: none; background: #444; color: white; box-shadow: 0 5px 0 #222; }
         .ctrl-btn:active { transform: translateY(3px); box-shadow: 0 2px 0 #222; }
-        
         #title-screen { display: flex; flex-direction: column; justify-content: center; align-items: center; width: 300px; height: 480px; background: #1a1a1a; border: 3px solid #555; border-radius: 15px; margin-top: 10px; }
         #title-logo { font-size: 38px; font-weight: bold; color: var(--gold); text-shadow: 0 0 15px var(--gold); margin-bottom: 40px; }
         #start-btn { padding: 18px 45px; font-size: 24px; background: #c0392b; color: white; border: none; border-radius: 40px; box-shadow: 0 5px 0 #7e261d; }
@@ -80,7 +51,7 @@ const HIGH_FREQ = "シロレバガツハツタンナマオコニコ".split("");
 const NORMAL_FREQ = "アイウオカキサスタダニクネホマミメラリルレワンバブビドーズー".split("");
 const WORDS = ["シロ","レバ","ガツ","コブクロ","ナンコツ","アブラ","ハツ","カシラ","ビール","ウメワリ","ブドウワリ","ウイスキー","サイダー","ツル","シンキ","タンナマ","オシンコ","ダイコン","ニコミ","ホネ","ツインズ"];
 const SHAPES = { I:[[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]], O:[[1,1],[1,1]], S:[[0,1,1],[1,1,0],[0,0,0]], Z:[[1,1,0],[0,1,1],[0,0,0]], J:[[1,0,0],[1,1,1],[0,0,0]], L:[[0,0,1],[1,1,1],[0,0,0]], T:[[0,1,0],[1,1,1],[0,0,0]] };
-const COLORS = { I:'var(--p-i)', O:'var(--p-o)', S:'var(--p-s)', Z:'var(--p-z)', J:'var(--p-j)', L:'var(--p-l)', T:'var(--p-t)' };
+const COLORS = { I:'#00f0f0', O:'#f0f000', S:'#00f000', Z:'#f00000', J:'#0000f0', L:'#f0a000', T:'#a000f0' };
 
 const cvs = document.getElementById('canvas'), ctx = cvs.getContext('2d'), scoreSpan = document.getElementById('score-val'), wordDiv = document.getElementById('word-overlay');
 cvs.width = COLS * BLOCK; cvs.height = ROWS * BLOCK;
@@ -90,7 +61,7 @@ let score = 0, over = false, lastTime = 0, dropCounter = 0, speed = 500, levelTi
 
 const AE = {
     ctx: null,
-    init() { if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); },
+    init() { if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); if (this.ctx.state === 'suspended') this.ctx.resume(); },
     osc(f, gVal, dur, type='sine') {
         const o = this.ctx.createOscillator(), g = this.ctx.createGain();
         o.type = type; o.connect(g); g.connect(this.ctx.destination);
@@ -104,10 +75,7 @@ const AE = {
         if (t==='lock') this.osc(120, 0.2, 0.1, 'triangle');
         else if (t==='clear') this.osc(800, 0.15, 0.4);
         else if (t==='word') this.osc(440, 0.1, 0.3, 'square').frequency.exponentialRampToValueAtTime(1320, this.ctx.currentTime + 0.3);
-        else if (t==='die') {
-            const o = this.osc(330, 0.2, 0.8, 'square');
-            o.frequency.exponentialRampToValueAtTime(110, this.ctx.currentTime + 0.8);
-        }
+        else if (t==='die') { const o = this.osc(330, 0.2, 0.8, 'square'); o.frequency.exponentialRampToValueAtTime(110, this.ctx.currentTime + 0.8); }
     },
     playBGM(l) {
         if (bgmInterval) clearInterval(bgmInterval);
@@ -116,81 +84,49 @@ const AE = {
     }
 };
 
-function getRandomChar() {
-    return Math.random() < 0.7 ? HIGH_FREQ[Math.floor(Math.random()*HIGH_FREQ.length)] : NORMAL_FREQ[Math.floor(Math.random()*NORMAL_FREQ.length)];
-}
+function getRandomChar() { return Math.random() < 0.7 ? HIGH_FREQ[Math.floor(Math.random()*HIGH_FREQ.length)] : NORMAL_FREQ[Math.floor(Math.random()*NORMAL_FREQ.length)]; }
 
 class Piece {
     constructor() {
-        const types = Object.keys(SHAPES);
-        this.type = types[Math.floor(Math.random()*types.length)];
-        this.color = COLORS[this.type];
-        let m = SHAPES[this.type];
-        for(let i=0, r=Math.floor(Math.random()*4); i<r; i++) m = m[0].map((_, idx) => m.map(row => row[idx]).reverse());
-        this.data = m.map(row => row.map(v => v ? getRandomChar() : null));
-        this.x = Math.floor(COLS/2 - m[0].length/2); this.y = 0;
+        const types = Object.keys(SHAPES); this.type = types[Math.floor(Math.random()*types.length)]; this.color = COLORS[this.type];
+        let m = SHAPES[this.type]; for(let i=0, r=Math.floor(Math.random()*4); i<r; i++) m = m[0].map((_, idx) => m.map(row => row[idx]).reverse());
+        this.data = m.map(row => row.map(v => v ? getRandomChar() : null)); this.x = Math.floor(COLS/2 - m[0].length/2); this.y = 0;
     }
     rotate() {
         const n = this.data[0].map((_, i) => this.data.map(row => row[i]).reverse());
-        if (!collide(this.x, this.y, n)) this.data = n;
-        else if (!collide(this.x-1, this.y, n)) { this.x--; this.data = n; }
-        else if (!collide(this.x+1, this.y, n)) { this.x++; this.data = n; }
+        if (!collide(this.x, this.y, n)) this.data = n; else if (!collide(this.x-1, this.y, n)) { this.x--; this.data = n; } else if (!collide(this.x+1, this.y, n)) { this.x++; this.data = n; }
     }
 }
 
-function startGame() {
-    AE.init(); document.getElementById('title-screen').style.display = 'none';
-    document.getElementById('game-container').style.display = 'block';
-    document.getElementById('controls-row').style.display = 'grid';
-    AE.playBGM(0); spawn(); requestAnimationFrame(update);
-}
-
-function collide(px, py, pd) {
-    return pd.some((row, dy) => row.some((char, dx) => char && (px+dx<0 || px+dx>=COLS || py+dy>=ROWS || (py+dy>=0 && grid[py+dy][px+dx]))));
-}
-
-function lock() {
-    AE.playSE('lock');
-    piece.data.forEach((row, dy) => row.forEach((char, dx) => { if (char) { if (piece.y+dy<0) triggerGameOver(); else grid[piece.y+dy][piece.x+dx] = {char, color: piece.color}; } }));
-    piece = null;
-    if (!over) { isSettling = true; splitAndSettle(); }
-}
-
-function triggerGameOver() {
-    if (over) return;
-    over = true;
-    AE.playSE('die');
-    document.getElementById('modal').style.display = 'flex';
-}
-
-function splitAndSettle() {
-    let m = false;
-    for (let y = ROWS-2; y >= 0; y--) for (let x = 0; x < COLS; x++) if (grid[y][x] && !grid[y+1][x]) { grid[y+1][x]=grid[y][x]; grid[y][x]=null; m=true; }
-    if (m) setTimeout(splitAndSettle, 40); else checkLines();
-}
+function startGame() { AE.init(); document.getElementById('title-screen').style.display = 'none'; document.getElementById('game-container').style.display = 'block'; document.getElementById('controls-row').style.display = 'grid'; AE.playBGM(0); spawn(); requestAnimationFrame(update); }
+function collide(px, py, pd) { return pd.some((row, dy) => row.some((char, dx) => char && (px+dx<0 || px+dx>=COLS || py+dy>=ROWS || (py+dy>=0 && grid[py+dy][px+dx])))); }
+function lock() { AE.playSE('lock'); piece.data.forEach((row, dy) => row.forEach((char, dx) => { if (char) { if (piece.y+dy<0) triggerGameOver(); else grid[piece.y+dy][piece.x+dx] = {char, color: piece.color}; } })); piece = null; if (!over) { isSettling = true; splitAndSettle(); } }
+function triggerGameOver() { if (over) return; over = true; AE.playSE('die'); document.getElementById('modal').style.display = 'flex'; }
+function splitAndSettle() { let m = false; for (let y = ROWS-2; y >= 0; y--) for (let x = 0; x < COLS; x++) if (grid[y][x] && !grid[y+1][x]) { grid[y+1][x]=grid[y][x]; grid[y][x]=null; m=true; } if (m) setTimeout(splitAndSettle, 40); else checkLines(); }
 
 function checkLines() {
     let f = false;
-    for (let y = 0; y < ROWS; y++) if (grid[y].every(c => c !== null)) {
-        f = true; AE.playSE('clear'); const s = grid[y].map(c => c.char).join("");
-        WORDS.forEach(w => { let i = 0; while((i=s.indexOf(w, i)) !== -1) { score += w.length*100; AE.playSE('word'); showGold(w); i+=w.length; } });
-        grid.splice(y, 1); grid.unshift(Array(COLS).fill(null)); score += 1000;
+    for (let y = 0; y < ROWS; y++) {
+        if (grid[y].every(c => c !== null)) {
+            f = true; AE.playSE('clear');
+            const rowChars = grid[y].map(c => c.char);
+            WORDS.forEach(word => {
+                let tempChars = [...rowChars]; let match = true;
+                for (let char of word) {
+                    const idx = tempChars.indexOf(char);
+                    if (idx !== -1) tempChars.splice(idx, 1); else { match = false; break; }
+                }
+                if (match) { score += word.length * 150; AE.playSE('word'); showGold(word); }
+            });
+            grid.splice(y, 1); grid.unshift(Array(COLS).fill(null)); score += 1000;
+        }
     }
-    scoreSpan.innerText = score;
-    if (f) splitAndSettle(); else { isSettling = false; spawn(); }
+    scoreSpan.innerText = score; if (f) splitAndSettle(); else { isSettling = false; spawn(); }
 }
 
 function showGold(w) { const d = document.createElement('span'); d.className='gold-msg'; d.innerText=w; wordDiv.appendChild(d); setTimeout(()=>d.remove(), 2000); }
 function spawn() { piece = new Piece(); if (collide(piece.x, piece.y, piece.data)) triggerGameOver(); }
-
-function handleInput(k) {
-    if (over || !piece || isSettling) return;
-    if (k==='ArrowLeft' && !collide(piece.x-1, piece.y, piece.data)) piece.x--;
-    if (k==='ArrowRight' && !collide(piece.x+1, piece.y, piece.data)) piece.x++;
-    if (k==='ArrowUp') piece.rotate();
-    draw();
-}
-
+function handleInput(k) { if (over || !piece || isSettling) return; if (k==='ArrowLeft' && !collide(piece.x-1, piece.y, piece.data)) piece.x--; if (k==='ArrowRight' && !collide(piece.x+1, piece.y, piece.data)) piece.x++; if (k==='ArrowUp') piece.rotate(); draw(); }
 function drop() { if (!piece || isSettling) return; if (!collide(piece.x, piece.y+1, piece.data)) piece.y++; else lock(); dropCounter = 0; }
 
 function draw() {
@@ -200,37 +136,17 @@ function draw() {
 }
 
 function drawBlock(x, y, col, char) {
-    const px = x * BLOCK;
-    const py = y * BLOCK;
-
-    // 軽量ファミコン風描画
-    ctx.fillStyle = col;
-    ctx.fillRect(px, py, BLOCK, BLOCK);
-
-    // 上と左のハイライトライン
-    ctx.fillStyle = "rgba(255,255,255,0.4)";
-    ctx.fillRect(px, py, BLOCK, 2);
-    ctx.fillRect(px, py, 2, BLOCK);
-
-    // 下と右のシャドウライン
-    ctx.fillStyle = "rgba(0,0,0,0.3)";
-    ctx.fillRect(px + BLOCK - 2, py, 2, BLOCK);
-    ctx.fillRect(px, py + BLOCK - 2, BLOCK, 2);
-
-    // 文字
-    ctx.font = 'bold 20px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.strokeStyle = '#000';
-    ctx.lineWidth = 3;
-    ctx.strokeText(char, px + BLOCK / 2, py + BLOCK / 2);
-    ctx.fillStyle = '#fff';
-    ctx.fillText(char, px + BLOCK / 2, py + BLOCK / 2);
+    const px = x * BLOCK, py = y * BLOCK;
+    ctx.fillStyle = col; ctx.fillRect(px, py, BLOCK, BLOCK);
+    ctx.fillStyle = "rgba(255,255,255,0.4)"; ctx.fillRect(px, py, BLOCK, 2); ctx.fillRect(px, py, 2, BLOCK);
+    ctx.fillStyle = "rgba(0,0,0,0.3)"; ctx.fillRect(px + BLOCK - 2, py, 2, BLOCK); ctx.fillRect(px, py + BLOCK - 2, BLOCK, 2);
+    ctx.font = 'bold 20px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.strokeStyle = '#000'; ctx.lineWidth = 3; ctx.strokeText(char, px + BLOCK / 2, py + BLOCK / 2);
+    ctx.fillStyle = '#fff'; ctx.fillText(char, px + BLOCK / 2, py + BLOCK / 2);
 }
 
 function update(t = 0) {
-    if (over) return;
-    const dt = t - lastTime; lastTime = t;
+    if (over) return; const dt = t - lastTime; lastTime = t;
     if (piece && !isSettling) {
         dropCounter += dt; levelTimer += dt;
         if (levelTimer > 15000) { speed = Math.max(100, speed-45); levelTimer=0; currentLevel = Math.min(2, currentLevel + 1); AE.playBGM(currentLevel); }
