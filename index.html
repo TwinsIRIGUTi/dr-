@@ -120,7 +120,7 @@ const scoreSpan = document.getElementById('score-val'), lvlSpan = document.getEl
 cvs.width = COLS * BLOCK; cvs.height = ROWS * BLOCK;
 
 let grid = Array.from({length: ROWS}, () => Array(COLS).fill(null));
-let score = 0, totalWordsCount = 0, linesCleared = 0, over = false, paused = false, lastTime = 0, dropCounter = 0, speed = 800, piece = null, nextQueue = [], isSettling = false, currentLevel = 0, bgmInterval = null, bgmStep = 0, currentBgmStage = 0;
+let score = 0, totalWordsCount = 0, linesCleared = 0, over = false, paused = false, lastTime = 0, dropCounter = 0, speed = 800, piece = null, nextQueue = [], isSettling = false, baseLevel = 0, currentLevel = 0, bgmInterval = null, bgmStep = 0, currentBgmStage = 0;
 let lockTimer = 0, lockDelay = 500, hardDropLockDelay = 1000, isHardDropped = false, inputDir = null, comboCount = 0;
 let soundEnabled = localStorage.getItem('motu_sound') !== 'OFF';
 
@@ -192,19 +192,23 @@ function saveStats() {
 
 function startGame(startLvl) { 
     AE.init(); 
+    baseLevel = startLvl;
     currentLevel = startLvl;
     lvlSpan.innerText = currentLevel;
-    
-    // レベルに応じた初期速度設定
-    if (currentLevel < 35) speed = Math.max(30, 800 - (currentLevel * 22));
-    else if (currentLevel < 50) speed = Math.max(1, 30 - (currentLevel - 35) * 2);
-    else speed = 1;
+    updateSpeed();
 
     document.getElementById('title-screen').style.display = 'none'; 
     document.getElementById('game-container').style.display = 'block'; 
     document.getElementById('controls-grid').style.display = 'grid'; 
     for(let i=0; i<4; i++) nextQueue.push(Object.keys(SHAPES)[Math.floor(Math.random()*7)]); 
     spawn(); requestAnimationFrame(update); AE.playBGM(); 
+}
+
+function updateSpeed() {
+    if (currentLevel < 35) speed = Math.max(30, 800 - (currentLevel * 22));
+    else if (currentLevel < 50) speed = Math.max(1, 30 - (currentLevel - 35) * 2);
+    else if (currentLevel < 100) speed = 1;
+    else speed = 0;
 }
 
 function collide(px, py, pd) { return pd.some((row, dy) => row.some((char, dx) => char && (px+dx<0 || px+dx>=COLS || py+dy>=ROWS || (py+dy>=0 && grid[py+dy][px+dx])))); }
@@ -255,16 +259,13 @@ function checkMatches() {
         linesCleared += linesThisTurn;
         
         const oldStage = getBgmStage(currentLevel);
-        // 開始レベルを加味した新しいレベル計算
-        const newLvl = Math.max(currentLevel, Math.floor(linesCleared / 10), Math.floor(score / 5000));
+        // レベル上昇ロジックの修正: ベースレベルに現在のプレイ分を加算
+        const gameProgressLvl = Math.max(Math.floor(linesCleared / 10), Math.floor(score / 5000));
+        const newLvl = baseLevel + gameProgressLvl;
         
         if (newLvl > currentLevel) {
             currentLevel = newLvl;
-            if (currentLevel < 35) { speed = Math.max(30, 800 - (currentLevel * 22)); }
-            else if (currentLevel < 50) { speed = Math.max(1, 30 - (currentLevel - 35) * 2); }
-            else if (currentLevel < 100) { speed = 1; }
-            else { speed = 0; }
-            
+            updateSpeed();
             AE.playSE('levelup');
             if (oldStage !== getBgmStage(currentLevel)) AE.playBGM();
         }
