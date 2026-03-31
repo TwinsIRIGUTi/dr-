@@ -23,7 +23,7 @@
         .top-btn { background: #444; border: 1px solid #777; color: white; padding: 4px 8px; font-size: 11px; border-radius: 4px; cursor: pointer; }
         #pause-overlay { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 15; justify-content: center; align-items: center; font-size: 40px; font-weight: bold; color: white; pointer-events: none; }
         #word-overlay { position: absolute; top: 35%; left: 50%; transform: translate(-50%, -50%); z-index: 100; text-align: center; pointer-events: none; width: 100%; }
-        .gold-msg { color: var(--gold); font-size: 32px; font-weight: bold; text-shadow: 0 0 15px #fff, 2px 2px 2px #000; animation: fOU 2s forwards; display: block; }
+        .gold-msg { color: var(--gold); font-size: 32px; font-weight: bold; text-shadow: 0 0 15px #fff, 2px 2px 2px #000; animation: fOU 2s forwards; display: block; position: absolute; width: 100%; left: 0; }
         @keyframes fOU { 0% { opacity: 0; transform: scale(0.5); } 10% { opacity: 1; transform: scale(1.1); } 90% { opacity: 1; transform: scale(1.1); } 100% { opacity: 0; transform: translateY(-40px); } }
         canvas { display: block; background: #000; }
         #controls-grid { width: 100%; display: none; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 15px; box-sizing: border-box; }
@@ -34,7 +34,10 @@
         #title-logo { font-size: 38px; font-weight: bold; color: var(--gold); text-shadow: 0 0 15px var(--gold); margin-bottom: 20px; }
         #best-stats { width: 85%; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 10px; margin-bottom: 20px; font-size: 13px; color: #ddd; border: 1px solid #444; }
         .stat-row { display: flex; justify-content: space-between; margin: 3px 0; }
-        #start-btn { padding: 18px 45px; font-size: 24px; background: #c0392b; color: white; border: none; border-radius: 40px; box-shadow: 0 5px 0 #7e261d; }
+        .start-btn-container { display: flex; flex-direction: column; gap: 12px; }
+        .btn-main { padding: 15px 40px; font-size: 20px; color: white; border: none; border-radius: 40px; cursor: pointer; font-weight: bold; }
+        #start-btn { background: #c0392b; box-shadow: 0 5px 0 #7e261d; }
+        #hard-btn { background: #6c3483; box-shadow: 0 5px 0 #4a235a; }
         #modal { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); flex-direction: column; justify-content: center; align-items: center; z-index: 200; text-align: center; }
         .result-val { color: var(--gold); font-size: 20px; margin: 5px 0; }
     </style>
@@ -49,7 +52,10 @@
                 <div class="stat-row"><span>WORDS</span><span id="best-words">0</span></div>
                 <div class="stat-row"><span>LEVEL</span><span id="best-level">0</span></div>
             </div>
-            <button id="start-btn" onclick="startGame()">START</button>
+            <div class="start-btn-container">
+                <button id="start-btn" class="btn-main" onclick="startGame(0)">NORMAL START</button>
+                <button id="hard-btn" class="btn-main" onclick="startGame(50)">HARD START (Lv.50)</button>
+            </div>
         </div>
         <div id="game-container">
             <div id="top-controls">
@@ -114,8 +120,8 @@ const scoreSpan = document.getElementById('score-val'), lvlSpan = document.getEl
 cvs.width = COLS * BLOCK; cvs.height = ROWS * BLOCK;
 
 let grid = Array.from({length: ROWS}, () => Array(COLS).fill(null));
-let score = 0, totalWordsCount = 0, linesCleared = 0, over = false, paused = false, lastTime = 0, dropCounter = 0, speed = 800, piece = null, nextQueue = [], isSettling = false, currentLevel = 0, bgmInterval = null, bgmStep = 0;
-let lockTimer = 0, lockDelay = 500, hardDropLockDelay = 1000, inputDir = null, comboCount = 0;
+let score = 0, totalWordsCount = 0, linesCleared = 0, over = false, paused = false, lastTime = 0, dropCounter = 0, speed = 800, piece = null, nextQueue = [], isSettling = false, currentLevel = 0, bgmInterval = null, bgmStep = 0, currentBgmStage = 0;
+let lockTimer = 0, lockDelay = 500, hardDropLockDelay = 1000, isHardDropped = false, inputDir = null, comboCount = 0;
 let soundEnabled = localStorage.getItem('motu_sound') !== 'OFF';
 
 const AE = {
@@ -139,18 +145,23 @@ const AE = {
         else if (t==='levelup') { [523.25, 659.25, 783.99].forEach((f, i) => { setTimeout(() => this.osc(f, 0.1, 0.2, 'sine'), i * 100); }); }
     },
     playBGM() {
+        const stage = getBgmStage(currentLevel);
+        if (bgmInterval && currentBgmStage === stage && soundEnabled) return; 
         if (bgmInterval) clearInterval(bgmInterval);
+        currentBgmStage = stage;
         if (!soundEnabled) return;
         
-        // 1: ファミコン風(Lv0-15), 2: テトリス風(Lv16-30), 3: オリジナル高難易度(Lv31-)
-        const bgm1 = [523, 659, 783, 659, 523, 659, 783, 659, 587, 698, 880, 698, 587, 698, 880, 698];
-        const bgm2 = [659, 493, 523, 587, 523, 493, 440, 440, 523, 659, 587, 523, 493, 523, 587, 659, 523, 440, 440];
-        const bgm3 = [440, 440, 880, 783, 659, 523, 587, 523, 440, 392, 440, 523, 587, 659, 440, 440];
-
-        const tempo = Math.max(70, 180 - (currentLevel * 3));
+        const bgms = [
+            [523, 659, 783, 659, 523, 659, 783, 659, 587, 698, 880, 698, 587, 698, 880, 698],
+            [659, 493, 523, 587, 523, 493, 440, 440, 523, 659, 587, 523, 493, 523, 587, 659, 523, 440, 440],
+            [440, 440, 880, 783, 659, 523, 587, 523, 440, 392, 440, 523, 587, 659, 440, 440],
+            [330, 392, 330, 261, 293, 261, 196, 196, 261, 330, 293, 261, 196, 261, 293, 330],
+            [880, 987, 1046, 1174, 1046, 987, 880, 783, 880, 1046, 1174, 1318, 1046, 880, 783, 880]
+        ];
+        const melody = bgms[stage - 1];
+        const tempo = Math.max(50, 180 - (currentLevel * 2));
         bgmInterval = setInterval(() => {
             if (!over && !paused && piece && !isSettling && soundEnabled) {
-                let melody = currentLevel <= 15 ? bgm1 : (currentLevel <= 30 ? bgm2 : bgm3);
                 this.osc(melody[bgmStep % melody.length], 0.012, 0.15);
                 if (bgmStep % 4 === 0) this.osc(110, 0.015, 0.1, 'triangle');
                 bgmStep++;
@@ -162,7 +173,7 @@ const AE = {
 function toggleSound() {
     soundEnabled = !soundEnabled; localStorage.setItem('motu_sound', soundEnabled ? 'ON' : 'OFF');
     document.getElementById('ingame-sound').innerText = soundEnabled ? "🔊 ON" : "🔇 OFF";
-    if (!soundEnabled) clearInterval(bgmInterval); else AE.playBGM();
+    if (!soundEnabled) { clearInterval(bgmInterval); bgmInterval = null; } else AE.playBGM();
 }
 function togglePause() { if (over) return; paused = !paused; document.getElementById('pause-overlay').style.display = paused ? 'flex' : 'none'; if (paused) inputDir = null; }
 function loadStats() {
@@ -179,8 +190,17 @@ function saveStats() {
     localStorage.setItem('motu_best_level', bLevel);
 }
 
-function startGame() { 
-    AE.init(); document.getElementById('title-screen').style.display = 'none'; 
+function startGame(startLvl) { 
+    AE.init(); 
+    currentLevel = startLvl;
+    lvlSpan.innerText = currentLevel;
+    
+    // レベルに応じた初期速度設定
+    if (currentLevel < 35) speed = Math.max(30, 800 - (currentLevel * 22));
+    else if (currentLevel < 50) speed = Math.max(1, 30 - (currentLevel - 35) * 2);
+    else speed = 1;
+
+    document.getElementById('title-screen').style.display = 'none'; 
     document.getElementById('game-container').style.display = 'block'; 
     document.getElementById('controls-grid').style.display = 'grid'; 
     for(let i=0; i<4; i++) nextQueue.push(Object.keys(SHAPES)[Math.floor(Math.random()*7)]); 
@@ -234,27 +254,38 @@ function checkMatches() {
         for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) if (toDelete[y][x]) grid[y][x] = null;
         linesCleared += linesThisTurn;
         
-        const oldBgmStage = currentLevel <= 15 ? 1 : (currentLevel <= 30 ? 2 : 3);
-        const newLvl = Math.max(Math.floor(linesCleared / 10), Math.floor(score / 5000));
+        const oldStage = getBgmStage(currentLevel);
+        // 開始レベルを加味した新しいレベル計算
+        const newLvl = Math.max(currentLevel, Math.floor(linesCleared / 10), Math.floor(score / 5000));
         
         if (newLvl > currentLevel) {
             currentLevel = newLvl;
             if (currentLevel < 35) { speed = Math.max(30, 800 - (currentLevel * 22)); }
             else if (currentLevel < 50) { speed = Math.max(1, 30 - (currentLevel - 35) * 2); }
-            else { speed = 1; }
+            else if (currentLevel < 100) { speed = 1; }
+            else { speed = 0; }
             
-            const newBgmStage = currentLevel <= 15 ? 1 : (currentLevel <= 30 ? 2 : 3);
             AE.playSE('levelup');
-            if (oldBgmStage !== newBgmStage) { AE.playBGM(); } // 段階が変わったときのみBGM再起動
+            if (oldStage !== getBgmStage(currentLevel)) AE.playBGM();
         }
         scoreSpan.innerText = score; lvlSpan.innerText = currentLevel; setTimeout(processSettling, 150);
     } else { isSettling = false; spawn(); }
 }
 
+function getBgmStage(lvl) {
+    if(lvl <= 15) return 1; if(lvl <= 30) return 2; if(lvl <= 50) return 3; if(lvl <= 75) return 4; return 5;
+}
+
 function isWordInList(word, list) { let temp = [...list]; for (let char of word) { let idx = temp.indexOf(char); if (idx === -1) return false; temp[idx] = null; } return true; }
 function markForDeletion(word, row, deleteRow) { let t = word.split(""); t.forEach(c => { for (let i = 0; i < row.length; i++) if (row[i] && row[i].char === c && !deleteRow[i]) { deleteRow[i] = true; break; } }); }
 function markForDeletionVertical(word, x, toDelete) { let t = word.split(""); t.forEach(c => { for (let y = 0; y < ROWS; y++) if (grid[y][x] && grid[y][x].char === c && !toDelete[y][x]) { toDelete[y][x] = true; break; } }); }
-function showGold(w) { const d = document.createElement('span'); d.className='gold-msg'; d.innerText=w; wordDiv.appendChild(d); setTimeout(()=>d.remove(), 2000); }
+
+function showGold(w) { 
+    const d = document.createElement('span'); d.className='gold-msg'; d.innerText=w; 
+    const offset = wordDiv.childElementCount * 35;
+    d.style.top = `${offset}px`;
+    wordDiv.appendChild(d); setTimeout(()=>d.remove(), 2000); 
+}
 
 class Piece {
     constructor(type) {
@@ -271,7 +302,12 @@ class Piece {
     }
 }
 
-function spawn() { piece = new Piece(nextQueue.shift()); nextQueue.push(Object.keys(SHAPES)[Math.floor(Math.random()*7)]); if (collide(piece.x, piece.y, piece.data)) triggerGameOver(); drawNext(); }
+function spawn() { 
+    piece = new Piece(nextQueue.shift()); 
+    nextQueue.push(Object.keys(SHAPES)[Math.floor(Math.random()*7)]); 
+    isHardDropped = false; lockTimer = 0;
+    if (collide(piece.x, piece.y, piece.data)) triggerGameOver(); drawNext(); 
+}
 function drawNext() {
     nextCtx.clearRect(0,0,60,180);
     nextQueue.forEach((type, i) => {
@@ -286,15 +322,21 @@ function handleInput(e, k) {
     if (k==='ArrowLeft' && !collide(piece.x-1, piece.y, piece.data)) { piece.x--; lockTimer = 0; }
     if (k==='ArrowRight' && !collide(piece.x+1, piece.y, piece.data)) { piece.x++; lockTimer = 0; }
     if (k==='ArrowUp') piece.rotate();
-    if (k==='HardDrop') { while(!collide(piece.x, piece.y+1, piece.data)) piece.y++; lockTimer = -500; }
+    if (k==='HardDrop') { while(!collide(piece.x, piece.y+1, piece.data)) piece.y++; isHardDropped = true; lockTimer = 0; }
 }
 function update(t = 0) {
     if (over) return; const dt = t - lastTime; lastTime = t;
     if (!paused) {
         if (piece && !isSettling) {
-            dropCounter += dt; const curL = lockTimer < 0 ? hardDropLockDelay : lockDelay;
-            if (dropCounter > speed) { if (!collide(piece.x, piece.y+1, piece.data)) { piece.y++; dropCounter = 0; lockTimer = 0; } else { lockTimer += dt; if (lockTimer > curL) lock(); } }
-            else if (collide(piece.x, piece.y+1, piece.data)) { lockTimer += dt; if (lockTimer > (lockTimer < 0 ? 0 : curL)) lock(); }
+            dropCounter += dt; 
+            const limit = isHardDropped ? hardDropLockDelay : lockDelay;
+            if (dropCounter > speed) { 
+                if (!collide(piece.x, piece.y+1, piece.data)) { piece.y++; dropCounter = 0; lockTimer = 0; } 
+                else { lockTimer += dt; if (lockTimer > limit) lock(); } 
+            }
+            else if (collide(piece.x, piece.y+1, piece.data)) { 
+                lockTimer += dt; if (lockTimer > limit) lock(); 
+            }
         }
     }
     draw(); requestAnimationFrame(update);
