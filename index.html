@@ -24,7 +24,7 @@
         #pause-overlay { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 15; justify-content: center; align-items: center; font-size: 40px; font-weight: bold; color: white; pointer-events: none; }
         #word-overlay { position: absolute; top: 35%; left: 50%; transform: translate(-50%, -50%); z-index: 100; text-align: center; pointer-events: none; width: 100%; }
         .gold-msg { color: var(--gold); font-size: 32px; font-weight: bold; text-shadow: 0 0 15px #fff, 2px 2px 2px #000; animation: fOU 2s forwards; display: block; position: absolute; width: 100%; left: 0; }
-        @keyframes fOU { 0% { opacity: 0; transform: scale(0.5); } 10% { opacity: 1; transform: scale(1.1); } 90% { opacity: 1; transform: scale(1.1); } 100% { opacity: 0; transform: translateY(-40px); } }
+        @keyframes fOU { 0% { opacity: 0; transform: scale(0.5); } 10% { opacity: 1; transform: scale(1.1); } 90% { opacity: 1; opacity: 1; transform: scale(1.1); } 100% { opacity: 0; transform: translateY(-40px); } }
         canvas { display: block; background: #000; }
         #controls-grid { width: 100%; display: none; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 15px; box-sizing: border-box; }
         .ctrl-btn { height: 70px; font-size: 24px; font-weight: bold; cursor: pointer; border-radius: 12px; border: none; background: #444; color: white; box-shadow: 0 5px 0 #222; -webkit-user-select: none; }
@@ -159,11 +159,11 @@ const AE = {
             [880, 987, 1046, 1174, 1046, 987, 880, 783, 880, 1046, 1174, 1318, 1046, 880, 783, 880]
         ];
         const melody = bgms[stage - 1];
-        const tempo = Math.max(50, 180 - (currentLevel * 2));
+        const tempo = Math.max(120, 350 - (currentLevel * 1.5));
         bgmInterval = setInterval(() => {
             if (!over && !paused && piece && !isSettling && soundEnabled) {
-                this.osc(melody[bgmStep % melody.length], 0.012, 0.15);
-                if (bgmStep % 4 === 0) this.osc(110, 0.015, 0.1, 'triangle');
+                this.osc(melody[bgmStep % melody.length], 0.012, 0.2); 
+                if (bgmStep % 4 === 0) this.osc(110, 0.015, 0.15, 'triangle');
                 bgmStep++;
             }
         }, tempo);
@@ -200,8 +200,12 @@ function startGame(startLvl) {
     document.getElementById('title-screen').style.display = 'none'; 
     document.getElementById('game-container').style.display = 'block'; 
     document.getElementById('controls-grid').style.display = 'grid'; 
-    for(let i=0; i<4; i++) nextQueue.push(Object.keys(SHAPES)[Math.floor(Math.random()*7)]); 
+    for(let i=0; i<4; i++) nextQueue.push(generateNextType()); 
     spawn(); requestAnimationFrame(update); AE.playBGM(); 
+}
+
+function generateNextType() {
+    return Object.keys(SHAPES)[Math.floor(Math.random()*7)];
 }
 
 function updateSpeed() {
@@ -211,11 +215,16 @@ function updateSpeed() {
     else speed = 0;
 }
 
-function collide(px, py, pd) { return pd.some((row, dy) => row.some((char, dx) => char && (px+dx<0 || px+dx>=COLS || py+dy>=ROWS || (py+dy>=0 && grid[py+dy][px+dx])))); }
+function collide(px, py, pd) { return pd.some((row, dy) => row.some((char, dx) => char !== null && (px+dx<0 || px+dx>=COLS || py+dy>=ROWS || (py+dy>=0 && grid[py+dy][px+dx])))); }
 
 function lock() {
     AE.playSE('lock');
-    piece.data.forEach((row, dy) => row.forEach((char, dx) => { if (char) { if (piece.y + dy < 0) triggerGameOver(); else grid[piece.y + dy][piece.x + dx] = {char, color: piece.color}; } }));
+    piece.data.forEach((row, dy) => row.forEach((char, dx) => { 
+        if (char !== null) { 
+            if (piece.y + dy < 0) triggerGameOver(); 
+            else grid[piece.y + dy][piece.x + dx] = {char, color: piece.color, isJunk: piece.isJunk}; 
+        } 
+    }));
     piece = null; if (!over) { isSettling = true; comboCount = 0; processSettling(); }
 }
 
@@ -229,7 +238,13 @@ function triggerGameOver() {
 
 function processSettling() {
     let moved = false;
-    for (let y = ROWS - 2; y >= 0; y--) for (let x = 0; x < COLS; x++) if (grid[y][x] && !grid[y+1][x]) { grid[y+1][x] = grid[y][x]; grid[y][x] = null; moved = true; }
+    for (let y = ROWS - 2; y >= 0; y--) {
+        for (let x = 0; x < COLS; x++) {
+            if (grid[y][x] && !grid[y][x].isJunk && !grid[y+1][x]) { 
+                grid[y+1][x] = grid[y][x]; grid[y][x] = null; moved = true; 
+            }
+        }
+    }
     if (moved) setTimeout(processSettling, 40); else checkMatches();
 }
 
@@ -238,7 +253,7 @@ function checkMatches() {
     let foundAny = false, matchWords = [], linesThisTurn = 0;
     
     for (let y = 0; y < ROWS; y++) {
-        let rowChars = grid[y].map(c => c ? c.char : null);
+        let rowChars = grid[y].map(c => (c && !c.isJunk) ? c.char : null);
         WORDS.forEach(word => { if (isWordInList(word, rowChars)) { foundAny = true; matchWords.push(word); markForDeletion(word, grid[y], toDelete[y]); } });
         if (grid[y].every(c => c !== null)) { 
             score += 1000; grid[y].forEach((_, x) => toDelete[y][x] = true); 
@@ -248,7 +263,7 @@ function checkMatches() {
     if (linesThisTurn >= 4) { score += 10000; showGold("TETRIS BONUS!"); }
 
     for (let x = 0; x < COLS; x++) {
-        let colChars = []; for (let y = 0; y < ROWS; y++) colChars.push(grid[y][x] ? grid[y][x].char : null);
+        let colChars = []; for (let y = 0; y < ROWS; y++) colChars.push((grid[y][x] && !grid[y][x].isJunk) ? grid[y][x].char : null);
         WORDS.forEach(word => { if (isWordInList(word, colChars)) { foundAny = true; matchWords.push(word); markForDeletionVertical(word, x, toDelete); } });
     }
 
@@ -259,7 +274,6 @@ function checkMatches() {
         linesCleared += linesThisTurn;
         
         const oldStage = getBgmStage(currentLevel);
-        // レベル上昇ロジックの修正: ベースレベルに現在のプレイ分を加算
         const gameProgressLvl = Math.max(Math.floor(linesCleared / 10), Math.floor(score / 5000));
         const newLvl = baseLevel + gameProgressLvl;
         
@@ -278,8 +292,8 @@ function getBgmStage(lvl) {
 }
 
 function isWordInList(word, list) { let temp = [...list]; for (let char of word) { let idx = temp.indexOf(char); if (idx === -1) return false; temp[idx] = null; } return true; }
-function markForDeletion(word, row, deleteRow) { let t = word.split(""); t.forEach(c => { for (let i = 0; i < row.length; i++) if (row[i] && row[i].char === c && !deleteRow[i]) { deleteRow[i] = true; break; } }); }
-function markForDeletionVertical(word, x, toDelete) { let t = word.split(""); t.forEach(c => { for (let y = 0; y < ROWS; y++) if (grid[y][x] && grid[y][x].char === c && !toDelete[y][x]) { toDelete[y][x] = true; break; } }); }
+function markForDeletion(word, row, deleteRow) { let t = word.split(""); t.forEach(c => { for (let i = 0; i < row.length; i++) if (row[i] && !row[i].isJunk && row[i].char === c && !deleteRow[i]) { deleteRow[i] = true; break; } }); }
+function markForDeletionVertical(word, x, toDelete) { let t = word.split(""); t.forEach(c => { for (let y = 0; y < ROWS; y++) if (grid[y][x] && !grid[y][x].isJunk && grid[y][x].char === c && !toDelete[y][x]) { toDelete[y][x] = true; break; } }); }
 
 function showGold(w) { 
     const d = document.createElement('span'); d.className='gold-msg'; d.innerText=w; 
@@ -290,12 +304,27 @@ function showGold(w) {
 
 class Piece {
     constructor(type) {
-        this.type = type; this.color = COLORS[this.type];
-        let m = SHAPES[this.type]; for(let i=0, r=Math.floor(Math.random()*4); i<r; i++) m = m[0].map((_, idx) => m.map(row => row[idx]).reverse());
-        this.data = m.map(row => row.map(v => v ? (Math.random() < 0.7 ? HIGH_FREQ[Math.floor(Math.random()*HIGH_FREQ.length)] : NORMAL_FREQ[Math.floor(Math.random()*NORMAL_FREQ.length)]) : null));
-        this.x = Math.floor(COLS/2 - m[0].length/2); this.y = 0;
+        this.type = type; 
+        this.isJunk = false;
+        if (currentLevel >= 50) {
+            const junkProb = Math.min(0.20, 0.05 + ((currentLevel - 50) / 50) * 0.15);
+            if (Math.random() < junkProb) this.isJunk = true;
+        }
+
+        if (this.isJunk) {
+            this.color = '#ffffff';
+            let m = SHAPES[this.type]; 
+            this.data = m.map(row => row.map(v => v ? "" : null));
+        } else {
+            this.color = COLORS[this.type];
+            let m = SHAPES[this.type]; 
+            for(let i=0, r=Math.floor(Math.random()*4); i<r; i++) m = m[0].map((_, idx) => m.map(row => row[idx]).reverse());
+            this.data = m.map(row => row.map(v => v ? (Math.random() < 0.7 ? HIGH_FREQ[Math.floor(Math.random()*HIGH_FREQ.length)] : NORMAL_FREQ[Math.floor(Math.random()*NORMAL_FREQ.length)]) : null));
+        }
+        this.x = Math.floor(COLS/2 - this.data[0].length/2); this.y = 0;
     }
     rotate() {
+        if (this.isJunk) return;
         const size = this.data.length; const n = Array.from({ length: size }, () => Array(size).fill(null));
         for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) n[x][size - 1 - y] = this.data[y][x];
         const kicks = [0, -1, 1, -2, 2];
@@ -305,7 +334,7 @@ class Piece {
 
 function spawn() { 
     piece = new Piece(nextQueue.shift()); 
-    nextQueue.push(Object.keys(SHAPES)[Math.floor(Math.random()*7)]); 
+    nextQueue.push(generateNextType()); 
     isHardDropped = false; lockTimer = 0;
     if (collide(piece.x, piece.y, piece.data)) triggerGameOver(); drawNext(); 
 }
@@ -345,14 +374,16 @@ function update(t = 0) {
 function draw() {
     ctx.clearRect(0, 0, cvs.width, cvs.height); ctx.fillStyle = '#000'; ctx.fillRect(0, 0, cvs.width, cvs.height);
     grid.forEach((row, y) => row.forEach((v, x) => v && drawBlock(x, y, v.color, v.char)));
-    if (piece) piece.data.forEach((row, dy) => row.forEach((char, dx) => char && drawBlock(piece.x+dx, piece.y+dy, piece.color, char)));
+    if (piece) piece.data.forEach((row, dy) => row.forEach((char, dx) => char !== null && drawBlock(piece.x+dx, piece.y+dy, piece.color, char)));
 }
 function drawBlock(x, y, col, char) {
     const px = x * BLOCK, py = y * BLOCK; ctx.fillStyle = col; ctx.fillRect(px, py, BLOCK, BLOCK);
     ctx.fillStyle = "rgba(255,255,255,0.4)"; ctx.fillRect(px, py, BLOCK, 2);
-    ctx.font = 'bold 20px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.strokeStyle = '#000'; ctx.lineWidth = 3; ctx.strokeText(char, px + BLOCK / 2, py + BLOCK / 2);
-    ctx.fillStyle = '#fff'; ctx.fillText(char, px + BLOCK / 2, py + BLOCK / 2);
+    if (char !== "") {
+        ctx.font = 'bold 20px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.strokeStyle = '#000'; ctx.lineWidth = 3; ctx.strokeText(char, px + BLOCK / 2, py + BLOCK / 2);
+        ctx.fillStyle = '#fff'; ctx.fillText(char, px + BLOCK / 2, py + BLOCK / 2);
+    }
 }
 loadStats();
 document.getElementById('ingame-sound').innerText = soundEnabled ? "🔊 ON" : "🔇 OFF";
