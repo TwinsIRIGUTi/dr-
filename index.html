@@ -148,7 +148,6 @@ const AE = {
     playBGM() {
         const stage = getBgmStage(currentLevel);
         const pinchStatus = checkPinch();
-        // BGMリセット条件: ステージが変わったか、ピンチ状態（速度）が変わったか
         if (bgmInterval && currentBgmStage === stage && isPinch === pinchStatus && soundEnabled) return; 
         
         if (bgmInterval) clearInterval(bgmInterval);
@@ -165,7 +164,6 @@ const AE = {
         ];
         const melody = bgms[stage - 1];
         let baseTempo = Math.max(120, 350 - (currentLevel * 1.5));
-        // ピンチ時はテンポを速める
         const tempo = isPinch ? baseTempo / 1.5 : baseTempo;
 
         bgmInterval = setInterval(() => {
@@ -179,8 +177,6 @@ const AE = {
 };
 
 function checkPinch() {
-    // 60%ライン = 18 * 0.6 = 10.8 -> 11段目(下から数えて)
-    // grid[0]〜[6]にブロックがあればピンチ。解消は半分(9段目) = grid[8]以下になれば安全。
     let highestLine = ROWS;
     for(let y=0; y<ROWS; y++) {
         if(grid[y].some(cell => cell !== null)) {
@@ -189,9 +185,9 @@ function checkPinch() {
         }
     }
     const stackHeight = ROWS - highestLine;
-    if (!isPinch && stackHeight >= 11) return true; // ピンチ突入
-    if (isPinch && stackHeight < 9) return false;   // 解消
-    return isPinch; // 状態維持
+    if (!isPinch && stackHeight >= 11) return true;
+    if (isPinch && stackHeight < 9) return false;
+    return isPinch;
 }
 
 function toggleSound() {
@@ -228,7 +224,6 @@ function startGame(startLvl) {
     spawn(); requestAnimationFrame(update); AE.playBGM(); 
 }
 
-// 抽選用クラス（インスタンス化せず情報を保持）
 class PieceInfo {
     constructor() {
         this.type = Object.keys(SHAPES)[Math.floor(Math.random()*7)];
@@ -281,7 +276,7 @@ function processSettling() {
     }
     if (moved) setTimeout(processSettling, 40); else {
         checkMatches();
-        AE.playBGM(); // ピンチ状態の変化を確認して反映
+        AE.playBGM();
     }
 }
 
@@ -347,6 +342,8 @@ class Piece {
         if (this.isJunk) {
             this.color = '#ffffff';
             let m = SHAPES[this.type]; 
+            // お邪魔ブロックもランダムな向きで生成
+            for(let i=0, r=Math.floor(Math.random()*4); i<r; i++) m = m[0].map((_, idx) => m.map(row => row[idx]).reverse());
             this.data = m.map(row => row.map(v => v ? "" : null));
         } else {
             this.color = COLORS[this.type];
@@ -357,7 +354,7 @@ class Piece {
         this.x = Math.floor(COLS/2 - this.data[0].length/2); this.y = 0;
     }
     rotate() {
-        if (this.isJunk) return;
+        // お邪魔ブロックでも回転できるように変更
         const size = this.data.length; const n = Array.from({ length: size }, () => Array(size).fill(null));
         for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) n[x][size - 1 - y] = this.data[y][x];
         const kicks = [0, -1, 1, -2, 2];
