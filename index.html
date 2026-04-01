@@ -123,6 +123,7 @@ let grid = Array.from({length: ROWS}, () => Array(COLS).fill(null));
 let score = 0, totalWordsCount = 0, linesCleared = 0, over = false, paused = false, lastTime = 0, dropCounter = 0, speed = 800, piece = null, nextQueue = [], isSettling = false, baseLevel = 0, currentLevel = 0, bgmInterval = null, bgmStep = 0, currentBgmStage = 0;
 let lockTimer = 0, lockDelay = 500, hardDropLockDelay = 1000, isHardDropped = false, inputDir = null, comboCount = 0;
 let soundEnabled = localStorage.getItem('motu_sound') !== 'OFF';
+let isPinch = false;
 
 const AE = {
     ctx: null,
@@ -146,9 +147,13 @@ const AE = {
     },
     playBGM() {
         const stage = getBgmStage(currentLevel);
-        if (bgmInterval && currentBgmStage === stage && soundEnabled) return; 
+        const pinchStatus = checkPinch();
+        // BGMリセット条件: ステージが変わったか、ピンチ状態（速度）が変わったか
+        if (bgmInterval && currentBgmStage === stage && isPinch === pinchStatus && soundEnabled) return; 
+        
         if (bgmInterval) clearInterval(bgmInterval);
         currentBgmStage = stage;
+        isPinch = pinchStatus;
         if (!soundEnabled) return;
         
         const bgms = [
@@ -159,7 +164,10 @@ const AE = {
             [880, 987, 1046, 1174, 1046, 987, 880, 783, 880, 1046, 1174, 1318, 1046, 880, 783, 880]
         ];
         const melody = bgms[stage - 1];
-        const tempo = Math.max(120, 350 - (currentLevel * 1.5));
+        let baseTempo = Math.max(120, 350 - (currentLevel * 1.5));
+        // ピンチ時はテンポを速める
+        const tempo = isPinch ? baseTempo / 1.5 : baseTempo;
+
         bgmInterval = setInterval(() => {
             if (!over && !paused && piece && !isSettling && soundEnabled) {
                 this.osc(melody[bgmStep % melody.length], 0.012, 0.2); 
@@ -169,6 +177,22 @@ const AE = {
         }, tempo);
     }
 };
+
+function checkPinch() {
+    // 60%ライン = 18 * 0.6 = 10.8 -> 11段目(下から数えて)
+    // grid[0]〜[6]にブロックがあればピンチ。解消は半分(9段目) = grid[8]以下になれば安全。
+    let highestLine = ROWS;
+    for(let y=0; y<ROWS; y++) {
+        if(grid[y].some(cell => cell !== null)) {
+            highestLine = y;
+            break;
+        }
+    }
+    const stackHeight = ROWS - highestLine;
+    if (!isPinch && stackHeight >= 11) return true; // ピンチ突入
+    if (isPinch && stackHeight < 9) return false;   // 解消
+    return isPinch; // 状態維持
+}
 
 function toggleSound() {
     soundEnabled = !soundEnabled; localStorage.setItem('motu_sound', soundEnabled ? 'ON' : 'OFF');
@@ -200,12 +224,22 @@ function startGame(startLvl) {
     document.getElementById('title-screen').style.display = 'none'; 
     document.getElementById('game-container').style.display = 'block'; 
     document.getElementById('controls-grid').style.display = 'grid'; 
-    for(let i=0; i<4; i++) nextQueue.push(generateNextType()); 
+    for(let i=0; i<4; i++) nextQueue.push(new PieceInfo()); 
     spawn(); requestAnimationFrame(update); AE.playBGM(); 
 }
 
+// 抽選用クラス（インスタンス化せず情報を保持）
+class PieceInfo {
+    constructor() {
+        this.type = Object.keys(SHAPES)[Math.floor(Math.random()*7)];
+        this.isJunk = false;
+        let junkProb = (currentLevel >= 50) ? Math.min(0.20, 0.05 + ((currentLevel - 50) / 50) * 0.15) : 0.01;
+        if (Math.random() < junkProb) this.isJunk = true;
+    }
+}
+
 function generateNextType() {
-    return Object.keys(SHAPES)[Math.floor(Math.random()*7)];
+    return new PieceInfo();
 }
 
 function updateSpeed() {
@@ -245,7 +279,10 @@ function processSettling() {
             }
         }
     }
-    if (moved) setTimeout(processSettling, 40); else checkMatches();
+    if (moved) setTimeout(processSettling, 40); else {
+        checkMatches();
+        AE.playBGM(); // ピンチ状態の変化を確認して反映
+    }
 }
 
 function checkMatches() {
@@ -284,7 +321,7 @@ function checkMatches() {
             if (oldStage !== getBgmStage(currentLevel)) AE.playBGM();
         }
         scoreSpan.innerText = score; lvlSpan.innerText = currentLevel; setTimeout(processSettling, 150);
-    } else { isSettling = false; spawn(); }
+    } else { isSettling = false; spawn(); AE.playBGM(); }
 }
 
 function getBgmStage(lvl) {
@@ -303,20 +340,10 @@ function showGold(w) {
 }
 
 class Piece {
-    constructor(type) {
-        this.type = type; 
-        this.isJunk = false;
+    constructor(info) {
+        this.type = info.type; 
+        this.isJunk = info.isJunk;
         
-        let junkProb = 0;
-        if (currentLevel >= 50) {
-            junkProb = Math.min(0.20, 0.05 + ((currentLevel - 50) / 50) * 0.15);
-        } else {
-            // Lv1〜49の間は1%の超低確率でお邪魔ブロック出現
-            junkProb = 0.01;
-        }
-        
-        if (Math.random() < junkProb) this.isJunk = true;
-
         if (this.isJunk) {
             this.color = '#ffffff';
             let m = SHAPES[this.type]; 
@@ -346,15 +373,16 @@ function spawn() {
 }
 function drawNext() {
     nextCtx.clearRect(0,0,60,180);
-    nextQueue.forEach((type, i) => {
-        const m = SHAPES[type]; nextCtx.fillStyle = COLORS[type];
+    nextQueue.forEach((info, i) => {
+        const m = SHAPES[info.type]; 
+        nextCtx.fillStyle = info.isJunk ? '#ffffff' : COLORS[info.type];
         m.forEach((row, dy) => row.forEach((v, dx) => { if(v) nextCtx.fillRect(dx*10 + 10, dy*10 + i*50 + 10, 8, 8); }));
     });
 }
-function startInput(e, dir) { if(e) e.preventDefault(); if(!paused && !over) { handleInput(null, dir); inputDir = dir; } }
-function stopInput(e) { if(e) e.preventDefault(); inputDir = null; }
-function handleInput(e, k) {
-    if (e) e.preventDefault(); if (over || paused || !piece || isSettling) return;
+function startInput(event, dir) { if(event) event.preventDefault(); if(!paused && !over) { handleInput(null, dir); inputDir = dir; } }
+function stopInput(event) { if(event) event.preventDefault(); inputDir = null; }
+function handleInput(event, k) {
+    if (event) event.preventDefault(); if (over || paused || !piece || isSettling) return;
     if (k==='ArrowLeft' && !collide(piece.x-1, piece.y, piece.data)) { piece.x--; lockTimer = 0; }
     if (k==='ArrowRight' && !collide(piece.x+1, piece.y, piece.data)) { piece.x++; lockTimer = 0; }
     if (k==='ArrowUp') piece.rotate();
