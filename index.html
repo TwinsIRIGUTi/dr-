@@ -28,7 +28,6 @@
         canvas { display: block; background: #000; }
         #controls-grid { width: 100%; display: none; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 15px; box-sizing: border-box; }
         .ctrl-btn { height: 70px; font-size: 24px; font-weight: bold; cursor: pointer; border-radius: 12px; border: none; background: #444; color: white; box-shadow: 0 5px 0 #222; -webkit-user-select: none; }
-        /* 左右と回転ボタンを縦に大きく設定 */
         .tall-btn { height: 120px; }
         .ctrl-btn:active { transform: translateY(3px); box-shadow: 0 2px 0 #222; }
         .drop-btn { background: #2e86c1; grid-column: 2; height: 60px; }
@@ -84,8 +83,8 @@
         </div>
     </div>
     <div id="controls-grid">
-        <button class="ctrl-btn tall-btn" onmousedown="startInput(event,'ArrowLeft')" ontouchstart="startInput(event,'ArrowLeft')" onmouseup="stopInput(event)" ontouchend="stopInput(event)">←</button>
         <button class="ctrl-btn tall-btn" style="background:#6c3483;" onmousedown="handleInput(event,'ArrowUp')" ontouchstart="handleInput(event,'ArrowUp')">回転</button>
+        <button class="ctrl-btn tall-btn" onmousedown="startInput(event,'ArrowLeft')" ontouchstart="startInput(event,'ArrowLeft')" onmouseup="stopInput(event)" ontouchend="stopInput(event)">←</button>
         <button class="ctrl-btn tall-btn" onmousedown="startInput(event,'ArrowRight')" ontouchstart="startInput(event,'ArrowRight')" onmouseup="stopInput(event)" ontouchend="stopInput(event)">→</button>
         <div></div>
         <button class="ctrl-btn drop-btn" onmousedown="handleInput(event,'HardDrop')" ontouchstart="handleInput(event,'HardDrop')">落下</button>
